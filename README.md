@@ -84,6 +84,29 @@ Akun default superadmin:
 - **Username:** `admin`
 - **Password:** `admin123`
 
+### Mode 3: Deploy di VPS Docker (Domain fintax.zandev.id)
+
+1. Clone repo di VPS:
+   ```bash
+   git clone https://github.com/mistererte234-source/ZanFin.git
+   cd ZanFin
+   docker compose up -d --build
+   ```
+
+2. Pasang konfigurasi Nginx (`/etc/nginx/sites-available/fintax.zandev.id`):
+   ```bash
+   sudo cp nginx-fintax.conf /etc/nginx/sites-available/fintax.zandev.id
+   sudo ln -s /etc/nginx/sites-available/fintax.zandev.id /etc/nginx/sites-enabled/
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+3. Pasang SSL gratis Let's Encrypt:
+   ```bash
+   sudo certbot --nginx -d fintax.zandev.id
+   ```
+
+Aplikasi langsung online di `https://fintax.zandev.id`!
+
 ---
 
 ## 📁 Struktur Berkas

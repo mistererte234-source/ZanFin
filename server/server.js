@@ -170,6 +170,11 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
 
+  // Healthcheck endpoint for Docker / uptime monitors
+  if (pathname === '/healthz' || pathname === '/api/health') {
+    return sendJson(res, 200, { ok: true, app: 'ZanFin', version: '1.0.0' });
+  }
+
   // Static files handling
   if (!pathname.startsWith('/api/')) {
     let filePath = path.join(PUB, pathname === '/' ? 'index.html' : pathname);
