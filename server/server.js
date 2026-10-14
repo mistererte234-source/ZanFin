@@ -383,6 +383,19 @@ const server = http.createServer(async (req, res) => {
         const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
       }
+
+      if (req.method === 'DELETE') {
+        const user = getSessionUser(req);
+        if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa menghapus akun' });
+        const body = JSON.parse(await readBody(req));
+        const { id } = body;
+        if (!id) return sendJson(res, 400, { error: 'ID user wajib diisi' });
+        if (Number(id) === Number(user.id)) return sendJson(res, 400, { error: 'Tidak dapat menghapus akun Anda sendiri yang sedang aktif' });
+
+        db.prepare('DELETE FROM users WHERE id = ?').run(id);
+        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        return sendJson(res, 200, { ok: true, users });
+      }
     }
 
     if (pathname === '/api/roles') {

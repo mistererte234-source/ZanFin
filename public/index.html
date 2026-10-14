@@ -1171,8 +1171,8 @@ function totalPajak(pid) {
    VIEW: LOGIN SCREEN (AUTHENTICATION GATEWAY)
    ========================================================================== */
 function vLogin() {
-  return '<div class="stack" style="padding-top:36px;max-width:400px;margin:0 auto">' +
-    '<div style="text-align:center;margin-bottom:12px">' +
+  return '<div class="stack" style="padding-top:42px;max-width:400px;margin:0 auto">' +
+    '<div style="text-align:center;margin-bottom:14px">' +
       '<div style="width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,var(--helm),#059669);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:32px;box-shadow:0 8px 24px rgba(16,185,129,.28);margin-bottom:12px">' +
         '🏛️' +
       '</div>' +
@@ -1180,37 +1180,17 @@ function vLogin() {
       '<div class="small muted" style="font-weight:600;margin-top:2px">Sistem Kontrol Keuangan &amp; Pajak Penelitian</div>' +
     '</div>' +
 
-    '<div class="card stack" style="padding:20px;gap:14px;box-shadow:0 4px 20px rgba(0,0,0,.08)">' +
+    '<div class="card stack" style="padding:22px;gap:14px;box-shadow:0 4px 24px rgba(0,0,0,.08)">' +
       '<h3 style="margin:0 0 2px;font-size:18px">Masuk ke Sistem</h3>' +
-      fld('Username', '<input id="l-u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="admin / ketua / bendahara">') +
+      fld('Username', '<input id="l-u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Masukkan username">') +
       fld('Password', '<input id="l-p" type="password" autocomplete="current-password" placeholder="••••••••">') +
       '<p class="err" id="l-e" style="margin:0"></p>' +
       '<button class="btn pri block" id="btn-login" onclick="doLogin()">Masuk</button>' +
-    '</div>' +
-
-    '<div class="card" style="background:var(--panel2);padding:14px">' +
-      '<div class="lab" style="margin-bottom:8px">Pilih Akun Cepat (Demo / Uji Coba):</div>' +
-      '<div class="stack" style="gap:8px;font-size:13px">' +
-        '<div class="row between"><span>👑 <b>Super Admin:</b> <code>admin</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickAdmin()">Isi Form</button></div>' +
-        '<div class="row between"><span>🎓 <b>Ketua Peneliti:</b> <code>ketua</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickKetua()">Isi Form</button></div>' +
-        '<div class="row between"><span>💼 <b>Bendahara Proyek:</b> <code>bendahara</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickBendahara()">Isi Form</button></div>' +
-      '</div>' +
+      '<p class="small muted" style="text-align:center;margin:8px 0 0;line-height:1.45">' +
+        'Gunakan akun resmi yang telah didaftarkan oleh Administrator sistem.' +
+      '</p>' +
     '</div>' +
   '</div>';
-}
-
-
-function quickAdmin() { quickFillLogin('admin', 'admin123'); }
-function quickKetua() { quickFillLogin('ketua', 'ketua123'); }
-function quickBendahara() { quickFillLogin('bendahara', 'bendahara123'); }
-
-function quickFillLogin(u, p) {
-  const uInp = $('#l-u');
-  const pInp = $('#l-p');
-  if (uInp) uInp.value = u;
-  if (pInp) pInp.value = p;
-  const btn = $('#btn-login');
-  if (btn) btn.focus();
 }
 
 async function doLogin() {
@@ -2511,12 +2491,12 @@ function vUsers() {
       list.map(u => {
         const r = ROLES[u.role] || ROLES.bendahara;
         return '<button class="it" onclick="sheetUserEdit(' + u.id + ')">' +
-          '<div class="avatar">' + r.icon + '</div>' +
+          '<div class="avatar">' + (r.icon || '👤') + '</div>' +
           '<div class="t">' +
-            '<b>' + esc(u.name) + (u.active ? '' : ' <span class="pill bad">Nonaktif</span>') + '</b>' +
-            '<span>@' + esc(u.username) + ' · <span class="pill ' + r.badgeClass + '" style="padding:1px 6px;font-size:10px">' + r.name + '</span></span>' +
+            '<b>' + esc(u.name) + (u.active ? '' : ' <span class="pill bad">Nonaktif</span>') + (u.id === ME?.id ? ' <span class="pill ok" style="padding:1px 6px;font-size:10px">Akun Anda</span>' : '') + '</b>' +
+            '<span>@' + esc(u.username) + ' · <span class="pill ' + (r.badgeClass || 'info') + '" style="padding:1px 6px;font-size:10px">' + esc(r.name) + '</span></span>' +
           '</div>' +
-          '<div class="r"><span class="small" style="color:var(--info);font-weight:700">Ubah</span></div>' +
+          '<div class="r"><span class="small" style="color:var(--info);font-weight:700">Ubah ›</span></div>' +
         '</button>';
       }).join('') +
     '</div>' +
@@ -2556,6 +2536,8 @@ function sheetUserEdit(userId = null) {
           '<span>Akun Aktif (Bisa Login)</span>' +
         '</label>'
       ) : '') +
+      (u && u.id !== ME?.id ?
+        '<button type="button" class="btn bad block" style="margin-top:8px" onclick="deleteUser(' + u.id + ', \'' + esc(u.username) + '\')">Hapus Akun Pengguna</button>' : '') +
     '</div>',
     u ? 'Simpan Perubahan' : 'Buat Akun',
     async () => {
@@ -2597,6 +2579,29 @@ function sheetUserEdit(userId = null) {
       }
     }
   );
+}
+
+
+async function deleteUser(userId, uname) {
+  if (!confirm('Yakin ingin menghapus akun @' + uname + ' secara permanen?\n\nData transaksi, kuitansi, atau catatan yang pernah dibuat oleh akun ini tetap tersimpan di sistem.')) return;
+  try {
+    const r = await fetch('/api/users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId })
+    });
+    const res = await r.json();
+    if (r.ok && res.users) {
+      USERS = res.users;
+      closeSheet();
+      toast('Akun @' + uname + ' berhasil dihapus');
+      render();
+    } else {
+      $('#sheet-e').textContent = res.error || 'Gagal menghapus akun.';
+    }
+  } catch (err) {
+    $('#sheet-e').textContent = 'Error koneksi: ' + err.message;
+  }
 }
 
 /* Sub-View: Checklist SPJ */
@@ -3008,12 +3013,7 @@ function sheetSwitchAccount() {
     '<div class="stack">' +
       fld('Username Akun', '<input id="sw-u" autocomplete="username" placeholder="admin / ketua / bendahara">') +
       fld('Password', '<input type="password" id="sw-p" autocomplete="current-password" placeholder="••••••••">') +
-      '<div class="card" style="background:var(--panel2);padding:10px 12px;font-size:12px">' +
-        '<b>Akun Bawaan Sistem:</b><br>' +
-        '• <code>admin</code>: Super Admin (semua proyek &amp; kelola user)<br>' +
-        '• <code>ketua</code>: Ketua Peneliti (approval &amp; tanda tangan LPJ)<br>' +
-        '• <code>bendahara</code>: Bendahara (catat kas, honor &amp; pajak Coretax)' +
-      '</div>' +
+      '<p class="small muted" style="margin:0">Masukkan username dan password akun yang dituju untuk berpindah sesi.</p>' +
     '</div>',
     'Masuk',
     async () => {
