@@ -1,0 +1,3245 @@
+# ZanFin UI Builder Script - Updated with Full Interactive Editing
+import os, json
+
+html_content = r'''<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZanFin — Kontrol Keuangan & Pajak Proyek Penelitian</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20500%20500%22%3E%3Cdefs%3E%3Cstyle%3E.st0%7Bfill%3A%230E1317%3B%7D.st1%7Bfill%3A%2310B981%3B%7D%3C/style%3E%3C/defs%3E%3Crect%20class%3D%22st0%22%20width%3D%22500%22%20height%3D%22500%22%20rx%3D%22250%22/%3E%3Cpath%20class%3D%22st1%22%20d%3D%22M250%2C90%20L380%2C160%20L380%2C340%20L250%2C410%20L120%2C340%20L120%2C160%20Z%22%20fill%3D%22none%22%20stroke%3D%22%2310B981%22%20stroke-width%3D%2228%22/%3E%3Ccircle%20cx%3D%22250%22%20cy%3D%22250%22%20r%3D%2255%22%20fill%3D%22%2310B981%22/%3E%3C/svg%3E">
+<meta name="theme-color" content="#0E1317">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZanFin">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0D1217;
+  --panel: #141C24;
+  --panel2: #1B2631;
+  --panel-glass: rgba(20, 28, 36, 0.75);
+  --ink: #EDF3F7;
+  --ink-secondary: #9DB0BF;
+  --muted: #647B8C;
+  --line: #22303E;
+  --line-strong: #2D4052;
+  --primary: #10B981;
+  --primary-ink: #04251B;
+  --primary-glow: rgba(16, 185, 129, 0.22);
+  --ok: #10B981;
+  --bad: #EF4444;
+  --bad-glow: rgba(239, 68, 68, 0.15);
+  --info: #38BDF8;
+  --warning: #F59E0B;
+  --purple: #818CF8;
+  --hero: #141C24;
+  --hero-ink: #EDF3F7;
+  --hero-muted: #849BB0;
+  --glass: rgba(13, 18, 23, 0.82);
+  --glass-strong: rgba(20, 28, 36, 0.94);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 9999px;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #F4F6F9;
+  --panel: #FFFFFF;
+  --panel2: #EAF0F6;
+  --panel-glass: rgba(255, 255, 255, 0.85);
+  --ink: #111A22;
+  --ink-secondary: #485A6A;
+  --muted: #798E9F;
+  --line: #D5DFE8;
+  --line-strong: #BCCBD8;
+  --primary: #059669;
+  --primary-ink: #FFFFFF;
+  --primary-glow: rgba(5, 150, 105, 0.15);
+  --ok: #059669;
+  --bad: #DC2626;
+  --bad-glow: rgba(220, 38, 38, 0.1);
+  --info: #0284C7;
+  --warning: #D97706;
+  --purple: #6366F1;
+  --hero: #111A22;
+  --hero-ink: #FFFFFF;
+  --hero-muted: #94A3B8;
+  --glass: rgba(244, 246, 249, 0.85);
+  --glass-strong: rgba(255, 255, 255, 0.95);
+  --glass-line: rgba(17, 26, 34, 0.08);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+.app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.num {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.tiny { font-size: 11.5px; }
+
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 700; }
+h2 { font-size: 20px; font-weight: 800; }
+h3 { font-size: 16px; font-weight: 700; }
+
+/* Top Header */
+header.top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  margin: 0 -16px 16px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 12px;
+  border-bottom: 1px solid var(--glass-line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--primary), #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-ink);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+.brand-icon svg { width: 18px; height: 18px; stroke-width: 2.3; }
+
+.projbtn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.15s ease;
+}
+.projbtn:hover { background: var(--panel2); }
+.projbtn b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+.projbtn span {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pill.ok { color: var(--ok); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08); }
+.pill.bad { color: var(--bad); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
+.pill.info { color: var(--info); border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); }
+.pill.warning { color: var(--warning); border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.08); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* Bottom Nav Dock */
+nav.bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  border-top: 1px solid var(--glass-line);
+  z-index: 25;
+  display: flex;
+  justify-content: center;
+}
+nav.bottom .in {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  max-width: 600px;
+  width: 100%;
+}
+nav.bottom button {
+  min-height: 60px;
+  background: none;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+nav.bottom button svg { width: 20px; height: 20px; stroke-width: 2; transition: transform 0.15s ease; }
+nav.bottom button:hover { color: var(--ink); }
+nav.bottom button[aria-current="page"] {
+  color: var(--primary);
+  font-weight: 750;
+}
+nav.bottom button[aria-current="page"] svg {
+  transform: translateY(-1px);
+  color: var(--primary);
+}
+nav.bottom button[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  bottom: 6px;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+/* Common Layout */
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.stack-sm { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.between { justify-content: space-between; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+/* Cards & Hero */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  position: relative;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.card.interactive:hover {
+  border-color: var(--line-strong);
+  cursor: pointer;
+}
+.card .lab {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.card .val {
+  font-size: clamp(18px, 5.2vw, 24px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+.card .sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.hero-fin {
+  background: linear-gradient(145deg, var(--panel) 0%, var(--panel2) 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  padding: 18px 18px 16px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+.hero-fin::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: var(--primary-glow);
+  filter: blur(40px);
+  pointer-events: none;
+}
+.hero-fin .lab {
+  color: var(--hero-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.hero-fin .big {
+  font-size: clamp(30px, 8.5vw, 42px);
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.15;
+  margin: 6px 0 2px;
+  letter-spacing: -0.03em;
+}
+.hero-fin .big .cur {
+  font-size: 0.52em;
+  font-weight: 700;
+  margin-right: 2px;
+  vertical-align: 0.45em;
+  opacity: 0.85;
+}
+.hero-fin .flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+.hero-fin .flow div { font-size: 11.5px; color: var(--muted); }
+.hero-fin .flow b {
+  display: block;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Progress bar */
+.bar-track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+  margin-top: 8px;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #34D399);
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+/* Buttons */
+.btn {
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  font-weight: 700;
+  font-size: 13.5px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.btn:hover { background: var(--line); }
+.btn:active { transform: scale(0.98); }
+.btn.pri {
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-color: transparent;
+  box-shadow: 0 4px 14px var(--primary-glow);
+}
+.btn.pri:hover { opacity: 0.92; }
+.btn.bad { color: var(--bad); border-color: rgba(239, 68, 68, 0.3); }
+.btn.bad:hover { background: rgba(239, 68, 68, 0.1); }
+.btn.sm { min-height: 34px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.iconbtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.iconbtn:hover { background: var(--line); color: var(--ink); border-color: var(--line-strong); }
+.iconbtn svg { width: 16px; height: 16px; }
+
+/* Segmented Control */
+.segment {
+  display: flex;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+  overflow-x: auto;
+}
+.segment button {
+  flex: 1;
+  background: none;
+  border: 0;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--muted);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.segment button.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Feed & List items */
+.item-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.item-card:hover {
+  border-color: var(--line-strong);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.badge.ok { background: rgba(16, 185, 129, 0.12); color: var(--ok); }
+.badge.bad { background: rgba(239, 68, 68, 0.12); color: var(--bad); }
+.badge.info { background: rgba(56, 189, 248, 0.12); color: var(--info); }
+.badge.warning { background: rgba(245, 158, 11, 0.12); color: var(--warning); }
+.badge.purple { background: rgba(129, 140, 248, 0.12); color: var(--purple); }
+
+/* Sheets / Drawer Modal */
+.sheet-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.sheet-bg.open { opacity: 1; pointer-events: auto; }
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 600px;
+  margin: 0 auto;
+  max-height: 90vh;
+  background: var(--panel);
+  border-top: 1px solid var(--line-strong);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(105%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+.sheet.open { transform: translateY(0); }
+
+.sheet-head {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--line-strong);
+  border-radius: 2px;
+  margin: 8px auto 0;
+}
+.sheet-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sheet-foot {
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+}
+
+/* Forms */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 700; color: var(--ink-secondary); }
+.field input, .field select, .field textarea {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.15s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--primary);
+  background: var(--panel);
+}
+.field .hint { font-size: 11.5px; color: var(--muted); }
+
+/* SPJ Checklist visual */
+.spj-check-box {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.check-item input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(30px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* Watermark Footer */
+.brand-footer {
+  text-align: center;
+  padding: 24px 0 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.brand-footer a {
+  color: var(--ink-secondary);
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.15s ease;
+}
+.brand-footer a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+/* Printable Slip Styles */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  header.top, nav.bottom, .no-print, .brand-footer { display: none !important; }
+  .sheet { position: static !important; max-height: none !important; transform: none !important; box-shadow: none !important; border: 0 !important; }
+  .sheet-bg { display: none !important; }
+  .print-area { display: block !important; padding: 20px !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+  
+  <footer class="brand-footer">
+    <a href="https://zandev.id" target="_blank" rel="noopener">Build n Code by <b>zandev.id</b></a>
+  </footer>
+</div>
+
+<nav class="bottom" id="nav"></nav>
+
+<!-- iOS Bottom Sheet Drawer -->
+<div class="sheet-bg" id="sheetbg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <h3 id="sheet-t">Form</h3>
+    <button class="iconbtn" onclick="closeSheet()" aria-label="Tutup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body" id="sheet-b"></div>
+  <div class="sheet-foot">
+    <button class="btn block" onclick="closeSheet()">Batal</button>
+    <button class="btn pri block" id="sheet-ok">Simpan</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/*
+ * ZanFin — Sistem Kontrol Keuangan, Pembantu Peneliti, dan Pajak Coretax.
+ * Build n Code by zandev.id
+ */
+
+const KEY = 'zanfin_db_v1';
+const THEME_KEY = 'zanfin_theme';
+
+const SVG_ICONS = {
+  nadi: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  kas: '<rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="17" cy="15" r="1"/>',
+  tim: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  honor: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  pajak: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  chevron: '<polyline points="6 9 12 15 18 9"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+};
+
+function svg(k) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG_ICONS[k] || ''}</svg>`;
+}
+
+const NAV_TABS = [
+  ['nadi', 'Nadi', svg('nadi')],
+  ['kas', 'Kas', svg('kas')],
+  ['tim', 'Tim', svg('tim')],
+  ['honor', 'Honor', svg('honor')],
+  ['pajak', 'Pajak', svg('pajak')]
+];
+
+let curView = 'tim'; // Default to tim to show immediate feedback!
+let activeKasTab = 'all';
+let activeTimFilter = 'all';
+let activePajakTab = 'coretax';
+
+// Pre-seeded real dataset from Excel & PDF
+function defaultSeed() {
+  const pid = 'proj_nadh_2026';
+  return {
+    v: 1,
+    activeId: pid,
+    projects: [
+      {
+        id: pid,
+        name: 'Riset Resiliensi Pangan & Gizi (Gresik & Batu)',
+        leader: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+        institution: 'FKM Universitas Airlangga / Kemendikbudristek',
+        scheme: 'Penelitian Terapan Unggulan PT (PTUPT)',
+        year: '2026',
+        budgetTotal: 120000000,
+        bankName: 'BNI Kantor Cabang Graha Unair',
+        bankAcc: '0987654321',
+        bankHolder: 'Dr. Ir. Hj. Nadhiroh, M.Kes'
+      }
+    ],
+    inflows: [
+      {
+        id: 'in_1',
+        pid: pid,
+        date: '2026-07-15',
+        termin: 'Termin 1 (70%)',
+        amount: 84000000,
+        source: 'Kemendikbudristek / DRTPM 2026',
+        sp2dNo: 'SP2D-DRTPM-7718/2026',
+        note: 'Pencairan tahap awal 70% dana hibah penelitian'
+      }
+    ],
+    team: [
+      {
+        id: 'tm_1',
+        pid: pid,
+        name: 'Ahmad Fathony Maulidy, S.T., M.T',
+        role: 'Narasumber',
+        nik: '3578011204850001',
+        npwp: '89.696.748.6-612.000',
+        phone: '081234567890',
+        bank: 'Mandiri - 1420019283711',
+        targetResponden: 1,
+        unitDefault: 'OJ',
+        rateDefault: 900000
+      },
+      {
+        id: 'tm_2',
+        pid: pid,
+        name: 'Lestari Aji, S.Pi, M.A.Gr',
+        role: 'Narasumber',
+        nik: '3579021406830002',
+        npwp: '49.991.641.9-623.000',
+        phone: '081398765432',
+        bank: 'BCA - 0182746152',
+        targetResponden: 1,
+        unitDefault: 'OJ',
+        rateDefault: 900000
+      },
+      {
+        id: 'tm_3',
+        pid: pid,
+        name: 'Iman Maulana, S.T.',
+        role: 'Narasumber',
+        nik: '3578152508880003',
+        npwp: '92.018.086.6-614.000',
+        phone: '081298127364',
+        bank: 'BNI - 0981726354',
+        targetResponden: 1,
+        unitDefault: 'OJ',
+        rateDefault: 900000
+      },
+      {
+        id: 'tm_4',
+        pid: pid,
+        name: 'Allisa Nadhira, S.Gz.',
+        role: 'Pengolah Data',
+        nik: '3516134111010000',
+        npwp: '3516134111010000',
+        phone: '085712349876',
+        bank: 'Mandiri - 1420019283746',
+        targetResponden: 1,
+        unitDefault: 'OK',
+        rateDefault: 1540000
+      },
+      // 8 Enumerators (Fully editable target & rate!)
+      { id: 'tm_enum_1', pid: pid, name: 'Ratu Dien Prima Fermeza., S.Gz.', role: 'Enumerator', nik: '3578016405010001', npwp: '62.527.930.2-606.000', phone: '082134567801', bank: 'BNI - 0829182711', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_2', pid: pid, name: 'Kayla Auraline Erlawan, S.Gz.', role: 'Enumerator', nik: '3578195311030001', npwp: '3578195311030001', phone: '082134567802', bank: 'BCA - 8271625341', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_3', pid: pid, name: 'Nafiisah Zana Dzakiyyah, S.Gz.', role: 'Enumerator', nik: '3578064312030004', npwp: '3578064312030004', phone: '082134567803', bank: 'Mandiri - 142009817263', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_4', pid: pid, name: 'Salma Violita Pradana, S.Gz', role: 'Enumerator', nik: '3504116603030002', npwp: '3504116603030002', phone: '082134567804', bank: 'BRI - 019283746501', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_5', pid: pid, name: 'Melanie Putri Anggraini, S.Gz', role: 'Enumerator', nik: '3517036002040001', npwp: '3517036002040001', phone: '082134567805', bank: 'BSI - 7182930192', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_6', pid: pid, name: 'Maulidina Maiyarani Amroe, S.Gz', role: 'Enumerator', nik: '3578085205040002', npwp: '3578085205040002', phone: '082134567806', bank: 'BNI - 0982716354', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_7', pid: pid, name: 'Layyina Azka Nabila, S.Gz.', role: 'Enumerator', nik: '3515164902040003', npwp: '3515164902040003', phone: '082134567807', bank: 'Mandiri - 142007819203', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      { id: 'tm_enum_8', pid: pid, name: 'Wichdah Layn Al’aqilah, S.Gz.', role: 'Enumerator', nik: '3514115709020002', npwp: '3514115709020002', phone: '082134567808', bank: 'BCA - 0817263542', targetResponden: 20, unitDefault: 'OR', rateDefault: 8000 },
+      // Vendors
+      {
+        id: 'tm_vend_1',
+        pid: pid,
+        name: 'Mukti Wibowo',
+        role: 'Driver / Rental Transport',
+        nik: '3578210903800001',
+        npwp: '71.661.226.2-643.000',
+        phone: '081299887766',
+        bank: 'BCA - 7819201928',
+        targetResponden: 1,
+        unitDefault: 'Unit',
+        rateDefault: 750000
+      },
+      {
+        id: 'tm_vend_2',
+        pid: pid,
+        name: 'Siti Nurhaeda',
+        role: 'Katering Konsumsi Rapat',
+        nik: '6402045402810002',
+        npwp: 'Non-PKP',
+        phone: '085288776655',
+        bank: 'BRI - 002918273645',
+        targetResponden: 1,
+        unitDefault: 'Paket',
+        rateDefault: 1600000
+      }
+    ],
+    expenses: [
+      { id: 'exp_1', pid: pid, date: '2026-08-01', no: '1', cat: 'Sewa Rumah', item: 'Pembayaran sewa rumah basecamp bulan Agustus 2026', sat: 'Bulan', qty: 1, price: 6000000, total: 6000000, recipient: 'Pemilik Rumah Lapangan', recipientNik: '3578012903750001', taxType: 'pph4_2', taxRate: 0.10, taxAmount: 600000, netAmount: 5400000, docs: { kuitansi: true, kontrak: true, ktp: true, foto_timestamp: true } },
+      { id: 'exp_25', pid: pid, date: '2026-09-02', no: '25', cat: 'Sewa Rumah', item: 'Pembayaran sewa rumah basecamp bulan September 2026', sat: 'Bulan', qty: 1, price: 6000000, total: 6000000, recipient: 'Pemilik Rumah Lapangan', recipientNik: '3578012903750001', taxType: 'pph4_2', taxRate: 0.10, taxAmount: 600000, netAmount: 5400000, docs: { kuitansi: true, kontrak: true, ktp: true, foto_timestamp: true } },
+      { id: 'exp_2', pid: pid, date: '2026-08-01', no: '2', cat: 'Sewa Kendaraan', item: 'Pembayaran sewa mobil operasional bulan Agustus dan September 2026', sat: 'Paket', qty: 1, price: 14700000, total: 14700000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 294000, netAmount: 14406000, docs: { kuitansi: true, kontrak: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_3', pid: pid, date: '2026-08-01', no: '3', cat: 'Sewa Kendaraan', item: 'Pembayaran sewa motor Mio bulan Agustus 2026', sat: 'Bulan', qty: 1, price: 1575000, total: 1575000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 31500, netAmount: 1543500, docs: { kuitansi: true, kontrak: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_4', pid: pid, date: '2026-08-01', no: '4', cat: 'Sewa Kendaraan', item: 'Pembayaran sewa motor Vario bulan Agustus 2026', sat: 'Bulan', qty: 1, price: 1575000, total: 1575000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 31500, netAmount: 1543500, docs: { kuitansi: true, kontrak: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_23', pid: pid, date: '2026-08-31', no: '23', cat: 'Sewa Kendaraan', item: 'Pembayaran sewa motor Mio bulan September 2026', sat: 'Bulan', qty: 1, price: 1575000, total: 1575000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 31500, netAmount: 1543500, docs: { kuitansi: true, kontrak: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_24', pid: pid, date: '2026-09-02', no: '24', cat: 'Sewa Kendaraan', item: 'Pembayaran sewa motor Filano bulan September 2026', sat: 'Bulan', qty: 1, price: 1575000, total: 1575000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 31500, netAmount: 1543500, docs: { kuitansi: true, kontrak: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_15', pid: pid, date: '2026-08-21', no: '15', cat: 'Konsumsi', item: 'Konsumsi FGD (Makan Rapat)', sat: 'Paket', qty: 1, price: 1600000, total: 1600000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 1600000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_16', pid: pid, date: '2026-08-21', no: '16', cat: 'Konsumsi', item: 'Konsumsi FGD (Snack Rapat)', sat: 'Paket', qty: 1, price: 640000, total: 640000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 640000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_36', pid: pid, date: '2026-09-15', no: '36', cat: 'Konsumsi', item: 'Konsumsi Edukasi Gizi 1 (Makan Rapat)', sat: 'Paket', qty: 1, price: 1600000, total: 1600000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 1600000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_37', pid: pid, date: '2026-09-15', no: '37', cat: 'Konsumsi', item: 'Konsumsi Edukasi Gizi 1 (Snack Rapat)', sat: 'Paket', qty: 1, price: 640000, total: 640000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 640000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_58', pid: pid, date: '2026-09-24', no: '58', cat: 'Konsumsi', item: 'Konsumsi Workshop 1 (Makan Rapat)', sat: 'Paket', qty: 1, price: 1400000, total: 1400000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 1400000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_59', pid: pid, date: '2026-09-24', no: '59', cat: 'Konsumsi', item: 'Konsumsi Workshop 1 (Snack Rapat)', sat: 'Paket', qty: 1, price: 560000, total: 560000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 560000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_65', pid: pid, date: '2026-09-29', no: '65', cat: 'Konsumsi', item: 'Konsumsi Edukasi Gizi 2 (Makan Rapat)', sat: 'Paket', qty: 1, price: 1600000, total: 1600000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 1600000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_66', pid: pid, date: '2026-09-29', no: '66', cat: 'Konsumsi', item: 'Konsumsi Edukasi Gizi 2 (Snack Rapat)', sat: 'Paket', qty: 1, price: 640000, total: 640000, recipient: 'Siti Nurhaeda', recipientNik: '6402045402810002', taxType: 'non_pkp', taxRate: 0, taxAmount: 0, netAmount: 640000, docs: { kuitansi: true, nik_penjual: true, daftar_hadir: true, notulensi: true, foto_timestamp: true } },
+      { id: 'exp_tr_12', pid: pid, date: '2026-08-12', no: '12', cat: 'Transport', item: 'Survey Pasar Kab. Gresik - Transport (PP)', sat: 'unit', qty: 1, price: 750000, total: 750000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 15000, netAmount: 735000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_14', pid: pid, date: '2026-08-14', no: '14', cat: 'Transport', item: 'Perizinan Pengambilan Data & Survey Pasar Kab. Batu - Transport (PP)', sat: 'unit', qty: 1, price: 980000, total: 980000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 19600, netAmount: 960400, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_18', pid: pid, date: '2026-08-18', no: '18', cat: 'Transport', item: 'FGD Uji Validitas Instrumen Kab. Gresik - Transport (PP)', sat: 'unit', qty: 1, price: 750000, total: 750000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 15000, netAmount: 735000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_24', pid: pid, date: '2026-08-24', no: '24', cat: 'Transport', item: 'FGD Uji Validitas Instrumen Kab. Batu - Transport (PP)', sat: 'unit', qty: 2, price: 850000, total: 1700000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 34000, netAmount: 1666000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_29', pid: pid, date: '2026-08-29', no: '29', cat: 'Transport', item: 'Perizinan Survey Rumah Tangga Kab. Gresik - Transport (1 hari)', sat: 'unit', qty: 1, price: 750000, total: 750000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 15000, netAmount: 735000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_31', pid: pid, date: '2026-08-31', no: '31', cat: 'Transport', item: 'Survey Rumah Tangga Kab. Gresik - Transport (PP)', sat: 'unit', qty: 2, price: 1125000, total: 2250000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 45000, netAmount: 2205000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_34', pid: pid, date: '2026-09-04', no: '34', cat: 'Transport', item: 'Survey Rumah Tangga Kab. Batu - Transport (PP)', sat: 'unit', qty: 1, price: 1700000, total: 1700000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 34000, netAmount: 1666000, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } },
+      { id: 'exp_tr_45', pid: pid, date: '2026-09-28', no: '45', cat: 'Transport', item: 'Diseminasi Hasil - Transport Sewa Mobil (sby-batu-gresik)', sat: 'unit', qty: 2, price: 2230000, total: 4460000, recipient: 'Mukti Wibowo', recipientNik: '3578210903800001', recipientNpwp: '71.661.226.2-643.000', taxType: 'pph23', taxRate: 0.02, taxAmount: 89200, netAmount: 4370800, docs: { kuitansi: true, stnk: true, non_pkp: true, foto_timestamp: true } }
+    ],
+    payroll: [
+      { id: 'pay_1', pid: pid, date: '2026-08-21', no: '17', teamId: 'tm_1', recipient: 'Ahmad Fathony Maulidy, S.T., M.T', role: 'Narasumber', nik: '3578011204850001', npwp: '89.696.748.6-612.000', activity: 'FGD Uji Validitas Instrumen Kab. Gresik - HR Narasumber 1', sat: 'OJ', qty: 1, price: 900000, bruto: 900000, taxRate: 0.05, taxAmount: 45000, netto: 855000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, foto: true } },
+      { id: 'pay_2', pid: pid, date: '2026-08-24', no: '23', teamId: 'tm_2', recipient: 'Lestari Aji, S.Pi, M.A.Gr', role: 'Narasumber', nik: '3579021406830002', npwp: '49.991.641.9-623.000', activity: 'FGD Uji Validitas Instrumen Kab. Batu - HR Narasumber 1', sat: 'OJ', qty: 1, price: 900000, bruto: 900000, taxRate: 0.05, taxAmount: 45000, netto: 855000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, foto: true } },
+      { id: 'pay_3', pid: pid, date: '2026-09-10', no: '39', teamId: 'tm_3', recipient: 'Iman Maulana, S.T.', role: 'Narasumber', nik: '3578152508880003', npwp: '92.018.086.6-614.000', activity: 'Workshop nLCA Sekunder & Assessmen Resiliensi dengan UNDRR Scorecard', sat: 'OJ', qty: 1, price: 900000, bruto: 900000, taxRate: 0.05, taxAmount: 45000, netto: 855000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, foto: true } },
+      { id: 'pay_4', pid: pid, date: '2026-09-28', no: '44', teamId: 'tm_2', recipient: 'Lestari Aji, S.Pi, M.A.Gr', role: 'Narasumber', nik: '3579021406830002', npwp: '49.991.641.9-623.000', activity: 'Diseminasi Hasil - HR Narasumber (Kab. Batu)', sat: 'OJ', qty: 1, price: 900000, bruto: 900000, taxRate: 0.05, taxAmount: 45000, netto: 855000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, foto: true } },
+      { id: 'pay_5', pid: pid, date: '2026-09-28', no: '44B', teamId: 'tm_1', recipient: 'Ahmad Fathony Maulidy, S.T., M.T', role: 'Narasumber', nik: '3578011204850001', npwp: '89.696.748.6-612.000', activity: 'Diseminasi Hasil - HR Narasumber (Kab. Gresik)', sat: 'OJ', qty: 1, price: 900000, bruto: 900000, taxRate: 0.05, taxAmount: 45000, netto: 855000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, foto: true } },
+      { id: 'pay_w1_1', pid: pid, date: '2026-09-24', no: '61', teamId: 'tm_1', recipient: 'Ahmad Fathony Maulidy, S.T., M.T', role: 'Narasumber', nik: '3578011204850001', npwp: '89.696.748.6-612.000', activity: 'Honorarium Narasumber Workshop 1 (1)', sat: 'Kegiatan', qty: 1, price: 1800000, bruto: 1800000, taxRate: 0.05, taxAmount: 90000, netto: 1710000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, rundown: true, foto: true } },
+      { id: 'pay_w1_2', pid: pid, date: '2026-09-24', no: '62', teamId: 'tm_2', recipient: 'Lestari Aji, S.Pi, M.A.Gr', role: 'Narasumber', nik: '3579021406830002', npwp: '49.991.641.9-623.000', activity: 'Honorarium Narasumber Workshop 1 (2)', sat: 'Kegiatan', qty: 1, price: 1800000, bruto: 1800000, taxRate: 0.05, taxAmount: 90000, netto: 1710000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, rundown: true, foto: true } },
+      { id: 'pay_eg_2', pid: pid, date: '2026-09-29', no: '68', teamId: 'tm_3', recipient: 'Iman Maulana, S.T.', role: 'Narasumber', nik: '3578152508880003', npwp: '92.018.086.6-614.000', activity: 'Honorarium Narasumber Edukasi Gizi 2', sat: 'Kegiatan', qty: 1, price: 1800000, bruto: 1800000, taxRate: 0.05, taxAmount: 90000, netto: 1710000, isPaid: true, docs: { undangan: true, cv: true, materi: true, npwp: true, kwitansi: true, kesediaan: true, daftar_hadir: true, rundown: true, foto: true } },
+      { id: 'pay_6', pid: pid, date: '2026-09-18', no: '55', teamId: 'tm_4', recipient: 'Allisa Nadhira, S.Gz.', role: 'Pengolah Data', nik: '3516134111010000', npwp: '3516134111010000', activity: 'Honor Pengolah Data (1 kegiatan)', sat: 'OK', qty: 1, price: 1540000, bruto: 1540000, taxRate: 0.05, taxAmount: 77000, netto: 1463000, isPaid: true, docs: { kwitansi: true, notulensi: true, daftar_hadir: true, npwp: true } },
+      // 8 Enumerators
+      { id: 'pay_en_1', pid: pid, date: '2026-09-05', no: '56-1', teamId: 'tm_enum_1', recipient: 'Ratu Dien Prima Fermeza., S.Gz.', role: 'Enumerator', nik: '3578016405010001', npwp: '62.527.930.2-606.000', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_2', pid: pid, date: '2026-09-05', no: '56-2', teamId: 'tm_enum_2', recipient: 'Kayla Auraline Erlawan, S.Gz.', role: 'Enumerator', nik: '3578195311030001', npwp: '3578195311030001', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_3', pid: pid, date: '2026-09-05', no: '56-3', teamId: 'tm_enum_3', recipient: 'Nafiisah Zana Dzakiyyah, S.Gz.', role: 'Enumerator', nik: '3578064312030004', npwp: '3578064312030004', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_4', pid: pid, date: '2026-09-05', no: '56-4', teamId: 'tm_enum_4', recipient: 'Salma Violita Pradana, S.Gz', role: 'Enumerator', nik: '3504116603030002', npwp: '3504116603030002', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_5', pid: pid, date: '2026-09-05', no: '56-5', teamId: 'tm_enum_5', recipient: 'Melanie Putri Anggraini, S.Gz', role: 'Enumerator', nik: '3517036002040001', npwp: '3517036002040001', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_6', pid: pid, date: '2026-09-05', no: '56-6', teamId: 'tm_enum_6', recipient: 'Maulidina Maiyarani Amroe, S.Gz', role: 'Enumerator', nik: '3578085205040002', npwp: '3578085205040002', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_7', pid: pid, date: '2026-09-05', no: '56-7', teamId: 'tm_enum_7', recipient: 'Layyina Azka Nabila, S.Gz.', role: 'Enumerator', nik: '3515164902040003', npwp: '3515164902040003', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } },
+      { id: 'pay_en_8', pid: pid, date: '2026-09-05', no: '56-8', teamId: 'tm_enum_8', recipient: 'Wichdah Layn Al’aqilah, S.Gz.', role: 'Enumerator', nik: '3514115709020002', npwp: '3514115709020002', activity: 'Honor Petugas Survei Rumah Tangga (20 Responden)', sat: 'OR', qty: 20, price: 8000, bruto: 160000, taxRate: 0.05, taxAmount: 8000, netto: 152000, isPaid: true, docs: { kwitansi: true, daftar_hadir: true, npwp: true } }
+    ]
+  };
+}
+
+let S = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  const seeded = defaultSeed();
+  saveState(seeded);
+  return seeded;
+}
+
+function saveState(stateToSave) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(stateToSave || S));
+  } catch (e) {
+    console.error('Save failed', e);
+  }
+}
+
+function curProj() {
+  return S.projects.find(p => p.id === S.activeId) || S.projects[0] || null;
+}
+
+function fmtRupiah(n) {
+  return 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+}
+
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString('id-ID');
+}
+
+function parseNum(str) {
+  if (typeof str === 'number') return str;
+  return Number((str || '').replace(/[^\d]/g, '')) || 0;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// Theme handling
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY) || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', cur);
+  localStorage.setItem(THEME_KEY, cur);
+  renderHeader();
+}
+
+// Drawer Sheet handling
+let onSheetOk = null;
+function openSheet(title, htmlBody, okText, okCb) {
+  document.getElementById('sheet-t').textContent = title;
+  document.getElementById('sheet-b').innerHTML = htmlBody;
+  const btn = document.getElementById('sheet-ok');
+  btn.textContent = okText || 'Simpan';
+  onSheetOk = okCb;
+  btn.onclick = () => {
+    if (onSheetOk && onSheetOk()) {
+      closeSheet();
+    }
+  };
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('sheetbg').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('open');
+  document.getElementById('sheetbg').classList.remove('open');
+  onSheetOk = null;
+}
+
+// Header
+function renderHeader() {
+  const p = curProj();
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.getElementById('top').innerHTML = `
+    <div class="brand-badge">
+      <div class="brand-icon">${svg('nadi')}</div>
+      <span>ZanFin</span>
+    </div>
+    <button class="projbtn" onclick="openProjectModal()">
+      <b>${p ? p.name : 'Pilih Proyek Riset'} ▾</b>
+      <span>${p ? p.leader + ' · ' + p.year : 'Kelola proyek'}</span>
+    </button>
+    <button class="pill ok" onclick="openProjectModal()">
+      <span class="dot"></span>${p ? 'Aktif' : 'Pilih'}
+    </button>
+    <button class="iconbtn" onclick="toggleTheme()" aria-label="Ganti Tema">
+      ${svg(theme === 'light' ? 'moon' : 'sun')}
+    </button>
+  `;
+}
+
+// Bottom Nav
+function renderNav() {
+  document.getElementById('nav').innerHTML = `
+    <div class="in">
+      ${NAV_TABS.map(([k, label, iconSvg]) => `
+        <button onclick="setView('${k}')" ${curView === k ? 'aria-current="page"' : ''}>
+          ${iconSvg}
+          <span>${label}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function setView(v) {
+  curView = v;
+  renderNav();
+  renderView();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Calculations
+function getFinancialStats() {
+  const p = curProj();
+  if (!p) return { totalPlafon: 0, totalMasuk: 0, totalKeluar: 0, totalHonor: 0, totalBelanja: 0, totalPajak: 0, saldoKas: 0, serapanPct: 0 };
+  
+  const pid = p.id;
+  const totalPlafon = p.budgetTotal || 0;
+  const totalMasuk = S.inflows.filter(i => i.pid === pid).reduce((s, x) => s + (x.amount || 0), 0);
+  
+  const totalBelanja = S.expenses.filter(e => e.pid === pid).reduce((s, x) => s + (x.total || 0), 0);
+  const totalHonor = S.payroll.filter(h => h.pid === pid).reduce((s, x) => s + (x.bruto || 0), 0);
+  const totalKeluar = totalBelanja + totalHonor;
+
+  const pajakBelanja = S.expenses.filter(e => e.pid === pid).reduce((s, x) => s + (x.taxAmount || 0), 0);
+  const pajakHonor = S.payroll.filter(h => h.pid === pid).reduce((s, x) => s + (x.taxAmount || 0), 0);
+  const totalPajak = pajakBelanja + pajakHonor;
+
+  const saldoKas = totalMasuk - totalKeluar;
+  const serapanPct = totalPlafon > 0 ? Math.min(100, Math.round((totalKeluar / totalPlafon) * 100)) : 0;
+
+  return { totalPlafon, totalMasuk, totalKeluar, totalHonor, totalBelanja, totalPajak, saldoKas, serapanPct };
+}
+
+function getAuditStats() {
+  const p = curProj();
+  if (!p) return { totalTrans: 0, fullyCompliant: 0, pendingDocs: 0, pct: 100 };
+  const pid = p.id;
+  const exps = S.expenses.filter(e => e.pid === pid);
+  const pays = S.payroll.filter(h => h.pid === pid);
+  const all = [...exps, ...pays];
+
+  let compliant = 0;
+  for (const item of all) {
+    const d = item.docs || {};
+    if (item.cat === 'Konsumsi') {
+      if (d.kuitansi && d.nik_penjual && d.daftar_hadir && d.notulensi) compliant++;
+    } else if (item.cat === 'Sewa Kendaraan') {
+      if (d.kuitansi && d.kontrak && d.stnk && d.non_pkp) compliant++;
+    } else if (item.cat === 'Sewa Rumah') {
+      if (d.kuitansi && d.kontrak && d.foto_timestamp) compliant++;
+    } else if (item.role === 'Narasumber') {
+      if (d.undangan && d.cv && d.materi && d.kwitansi && d.kesediaan) compliant++;
+    } else {
+      if (d.kwitansi && d.daftar_hadir) compliant++;
+    }
+  }
+
+  const total = all.length;
+  const pct = total > 0 ? Math.round((compliant / total) * 100) : 100;
+  return { totalTrans: total, fullyCompliant: compliant, pendingDocs: total - compliant, pct };
+}
+
+// Main View Dispatcher
+function renderView() {
+  const el = document.getElementById('view');
+  switch (curView) {
+    case 'nadi': el.innerHTML = vNadi(); break;
+    case 'kas': el.innerHTML = vKas(); break;
+    case 'tim': el.innerHTML = vTim(); break;
+    case 'honor': el.innerHTML = vHonor(); break;
+    case 'pajak': el.innerHTML = vPajak(); break;
+  }
+}
+
+/* =========================================================================
+   VIEW 1: NADI (DASHBOARD RINGKASAN KEUANGAN)
+   ========================================================================= */
+function vNadi() {
+  const st = getFinancialStats();
+  const aud = getAuditStats();
+  const p = curProj();
+  if (!p) return `<div class="card">Belum ada proyek. Silakan buat proyek riset baru.</div>`;
+
+  return `
+    <div class="stack">
+      <!-- Hero Card Keuangan -->
+      <div class="hero-fin">
+        <div class="row between">
+          <span class="lab">SALDO KAS PENELITIAN</span>
+          <span class="pill ${st.saldoKas >= 0 ? 'ok' : 'bad'}">
+            ${st.saldoKas >= 0 ? 'Surplus' : 'Defisit'}
+          </span>
+        </div>
+        <div class="big num"><span class="cur">Rp</span>${fmtNum(st.saldoKas)}</div>
+        <div class="sub muted">Tersedia di ${p.bankName} (${p.bankAcc})</div>
+
+        <div class="flow">
+          <div>
+            <span>DANA MASUK</span>
+            <b class="num in-c">${fmtRupiah(st.totalMasuk)}</b>
+          </div>
+          <div>
+            <span>TOTAL KELUAR</span>
+            <b class="num out-c">${fmtRupiah(st.totalKeluar)}</b>
+          </div>
+          <div>
+            <span>POTONGAN PAJAK</span>
+            <b class="num" style="color:var(--warning)">${fmtRupiah(st.totalPajak)}</b>
+          </div>
+        </div>
+
+        <div style="margin-top:14px">
+          <div class="row between small">
+            <span class="muted">Serapan Anggaran (${st.serapanPct}%)</span>
+            <span class="muted num">${fmtRupiah(st.totalKeluar)} / ${fmtRupiah(st.totalPlafon)}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: ${st.serapanPct}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="grid3">
+        <button class="btn sm" onclick="openAddInflowModal()">
+          ${svg('plus')} Dana Masuk
+        </button>
+        <button class="btn sm pri" onclick="openAddExpenseModal()">
+          ${svg('plus')} Belanja / Nota
+        </button>
+        <button class="btn sm" onclick="openBatchHonorModal()">
+          ${svg('honor')} Gaji Massal
+        </button>
+      </div>
+
+      <!-- SPJ & Coretax Audit Banner -->
+      <div class="card interactive" onclick="setView('pajak')">
+        <div class="row between">
+          <div class="row">
+            <span style="color:var(--primary); font-size:22px">${svg('pajak')}</span>
+            <div>
+              <h3 style="font-size:15px">Audit SPJ & Coretax Compliance</h3>
+              <div class="small muted">${aud.fullyCompliant} dari ${aud.totalTrans} transaksi berdokumen lengkap (${aud.pct}%)</div>
+            </div>
+          </div>
+          <span class="badge ${aud.pct >= 90 ? 'ok' : 'warning'}">${aud.pct}% Siap</span>
+        </div>
+        <div class="bar-track" style="margin-top:10px; height:6px">
+          <div class="bar-fill" style="width: ${aud.pct}%; background:${aud.pct >= 90 ? 'var(--ok)' : 'var(--warning)'}"></div>
+        </div>
+      </div>
+
+      <!-- Breakdown Belanja vs Honor -->
+      <div class="grid2">
+        <div class="card">
+          <span class="lab">PENGELUARAN BELANJA</span>
+          <div class="val num">${fmtRupiah(st.totalBelanja)}</div>
+          <div class="sub">Operasional, sewa & konsumsi</div>
+        </div>
+        <div class="card">
+          <span class="lab">HONOR PEMBANTU & PAKAR</span>
+          <div class="val num">${fmtRupiah(st.totalHonor)}</div>
+          <div class="sub">Enumerator, pengolah & pakar</div>
+        </div>
+      </div>
+
+      <!-- Feed Aktivitas Terbaru -->
+      <div class="stack-sm">
+        <div class="row between">
+          <h3>Aktivitas Pengeluaran Terbaru</h3>
+          <button class="pill" onclick="setView('kas')">Lihat Semua ▾</button>
+        </div>
+        ${renderRecentActivity(p.id)}
+      </div>
+
+      <!-- Quick Exports -->
+      <div class="card">
+        <div class="row between">
+          <div>
+            <h3 style="font-size:14.5px">Ekspor & Rekapitulasi</h3>
+            <div class="small muted">Unduh Buku Kas Umum & Dokumen Coretax DJP</div>
+          </div>
+          <div class="row">
+            <button class="btn sm" onclick="exportToExcel()">
+              ${svg('download')} Excel (.xlsx)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRecentActivity(pid) {
+  const exps = S.expenses.filter(e => e.pid === pid).map(e => ({ type: 'exp', title: e.item, amount: e.total, date: e.date, cat: e.cat, id: e.id, isTax: e.taxAmount > 0 }));
+  const pays = S.payroll.filter(h => h.pid === pid).map(h => ({ type: 'pay', title: 'Honor: ' + h.recipient + ' (' + h.activity + ')', amount: h.bruto, date: h.date, cat: 'Honorarium', id: h.id, isTax: h.taxAmount > 0 }));
+  const ins = S.inflows.filter(i => i.pid === pid).map(i => ({ type: 'in', title: 'Dana Masuk: ' + i.termin, amount: i.amount, date: i.date, cat: 'Hibah', id: i.id, isTax: false }));
+  
+  const combined = [...ins, ...exps, ...pays].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5);
+
+  if (!combined.length) return `<div class="card muted small">Belum ada transaksi pengeluaran atau dana masuk.</div>`;
+
+  return combined.map(c => `
+    <div class="item-card">
+      <div class="row between">
+        <div class="row" style="gap:10px">
+          <span class="badge ${c.type === 'in' ? 'ok' : 'purple'}">${c.cat}</span>
+          <span class="small muted num">${c.date}</span>
+        </div>
+        <b class="num ${c.type === 'in' ? 'in-c' : 'out-c'}" style="font-size:14.5px">
+          ${c.type === 'in' ? '+' : '-'}${fmtRupiah(c.amount)}
+        </b>
+      </div>
+      <div style="font-size:13.5px; font-weight:600; line-height:1.3">${c.title}</div>
+    </div>
+  `).join('');
+}
+
+/* =========================================================================
+   VIEW 2: KAS (DANA MASUK & DANA KELUAR)
+   ========================================================================= */
+function vKas() {
+  const p = curProj();
+  if (!p) return `<div class="card">Pilih proyek terlebih dahulu.</div>`;
+  const pid = p.id;
+
+  let items = [];
+  if (activeKasTab === 'all' || activeKasTab === 'in') {
+    items = items.concat(S.inflows.filter(i => i.pid === pid).map(i => ({ ...i, isIncome: true })));
+  }
+  if (activeKasTab === 'all' || activeKasTab === 'out') {
+    items = items.concat(S.expenses.filter(e => e.pid === pid).map(e => ({ ...e, isIncome: false })));
+  }
+
+  items.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  return `
+    <div class="stack">
+      <div class="row between">
+        <h2>Kas & Pengeluaran</h2>
+        <div class="row">
+          <button class="btn sm" onclick="openAddInflowModal()">+ Dana Masuk</button>
+          <button class="btn sm pri" onclick="openAddExpenseModal()">+ Belanja</button>
+        </div>
+      </div>
+
+      <!-- Segmented Control Tab -->
+      <div class="segment">
+        <button class="${activeKasTab === 'all' ? 'active' : ''}" onclick="setKasTab('all')">Semua Transaksi</button>
+        <button class="${activeKasTab === 'in' ? 'active' : ''}" onclick="setKasTab('in')">Dana Masuk (Hibah)</button>
+        <button class="${activeKasTab === 'out' ? 'active' : ''}" onclick="setKasTab('out')">Dana Keluar (Belanja)</button>
+      </div>
+
+      <!-- List of transactions -->
+      <div class="stack-sm">
+        ${items.length === 0 ? `<div class="card muted small">Tidak ada transaksi pada kategori ini.</div>` : items.map(t => renderKasRow(t)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function setKasTab(t) {
+  activeKasTab = t;
+  renderView();
+}
+
+function renderKasRow(t) {
+  if (t.isIncome) {
+    return `
+      <div class="item-card">
+        <div class="row between">
+          <span class="badge ok">DANA MASUK HIBAH</span>
+          <b class="num in-c" style="font-size:15px">+${fmtRupiah(t.amount)}</b>
+        </div>
+        <div style="font-weight:700; font-size:14.5px">${t.termin}</div>
+        <div class="small muted">${t.source} · SP2D: ${t.sp2dNo || '-'} · ${t.date}</div>
+        <div class="row between" style="margin-top:4px; border-top:1px solid var(--line); padding-top:6px">
+          <span class="tiny muted">Bank Penampung</span>
+          <div class="row">
+            <button class="btn sm" onclick="openEditInflowModal('${t.id}')">${svg('edit')} Edit</button>
+            <button class="iconbtn" style="width:34px;height:34px" onclick="deleteInflow('${t.id}')">${svg('trash')}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Expense row
+  const hasTax = t.taxAmount > 0;
+  const docs = t.docs || {};
+  const isCompliant = Object.values(docs).filter(Boolean).length >= 3;
+
+  return `
+    <div class="item-card">
+      <div class="row between">
+        <div class="row" style="gap:6px">
+          <span class="badge info">${t.cat || 'Belanja'}</span>
+          <span class="small muted num">No. ${t.no || '-'}</span>
+        </div>
+        <b class="num out-c" style="font-size:15px">-${fmtRupiah(t.total)}</b>
+      </div>
+      <div style="font-weight:700; font-size:14.5px">${t.item}</div>
+      <div class="row between small muted" style="margin-top:2px">
+        <span>${t.qty} ${t.sat} @ ${fmtRupiah(t.price)} · ${t.recipient}</span>
+        <span class="badge ${isCompliant ? 'ok' : 'warning'}">${isCompliant ? 'SPJ Siap' : 'Dokumen Kurang'}</span>
+      </div>
+      ${hasTax ? `
+        <div class="row between tiny" style="background:var(--panel2); padding:4px 8px; border-radius:6px; margin-top:4px">
+          <span class="muted">Potongan ${t.taxType ? t.taxType.toUpperCase() : 'Pajak'} (${Math.round((t.taxRate||0)*100)}%): <b class="num" style="color:var(--warning)">${fmtRupiah(t.taxAmount)}</b></span>
+          <span class="muted">Netto: <b class="num">${fmtRupiah(t.netAmount || (t.total - t.taxAmount))}</b></span>
+        </div>
+      ` : ''}
+
+      <div class="row between" style="margin-top:4px; border-top:1px solid var(--line); padding-top:6px">
+        <button class="btn sm" onclick="openAuditExpModal('${t.id}')">📋 Cek Dokumen SPJ</button>
+        <div class="row">
+          <button class="btn sm" onclick="openEditExpenseModal('${t.id}')">${svg('edit')} Edit</button>
+          <button class="iconbtn" style="width:34px;height:34px" onclick="deleteExpense('${t.id}')">${svg('trash')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================================
+   VIEW 3: TIM (PEMBANTU PENELITIAN & ROSTER)
+   ========================================================================= */
+function vTim() {
+  const p = curProj();
+  if (!p) return `<div class="card">Pilih proyek terlebih dahulu.</div>`;
+  const pid = p.id;
+  const allTeam = S.team.filter(t => t.pid === pid);
+
+  const enums = allTeam.filter(t => t.role === 'Enumerator');
+  const enumCount = enums.length;
+  const pakarCount = allTeam.filter(t => t.role === 'Narasumber').length;
+  const asistenCount = allTeam.filter(t => t.role.includes('Pengolah') || t.role.includes('Asisten')).length;
+
+  // Dynamic calculation for batch banner
+  const totalResp = enums.reduce((s, x) => s + (Number(x.targetResponden) || 20), 0);
+  const totalEst = enums.reduce((s, x) => s + ((Number(x.targetResponden) || 20) * (Number(x.rateDefault) || 8000)), 0);
+
+  let filtered = allTeam;
+  if (activeTimFilter === 'enum') filtered = enums;
+  if (activeTimFilter === 'pakar') filtered = allTeam.filter(t => t.role === 'Narasumber');
+  if (activeTimFilter === 'asisten') filtered = allTeam.filter(t => t.role.includes('Pengolah') || t.role.includes('Asisten'));
+
+  return `
+    <div class="stack">
+      <div class="row between">
+        <div>
+          <h2>Pembantu Penelitian</h2>
+          <div class="small muted">${allTeam.length} Personel Terdaftar (${enumCount} Enumerator, ${pakarCount} Pakar)</div>
+        </div>
+        <button class="btn sm pri" onclick="openAddTeamModal()">+ Personel</button>
+      </div>
+
+      <!-- Filter roles -->
+      <div class="segment">
+        <button class="${activeTimFilter === 'all' ? 'active' : ''}" onclick="setTimFilter('all')">Semua (${allTeam.length})</button>
+        <button class="${activeTimFilter === 'enum' ? 'active' : ''}" onclick="setTimFilter('enum')">Enumerator (${enumCount})</button>
+        <button class="${activeTimFilter === 'pakar' ? 'active' : ''}" onclick="setTimFilter('pakar')">Pakar/Narsum (${pakarCount})</button>
+        <button class="${activeTimFilter === 'asisten' ? 'active' : ''}" onclick="setTimFilter('asisten')">Asisten (${asistenCount})</button>
+      </div>
+
+      <!-- Dynamic Batch Pay Banner -->
+      <div class="card" style="background:linear-gradient(135deg, var(--panel), var(--panel2)); border-color:var(--primary)">
+        <div class="row between">
+          <div>
+            <h3 style="font-size:14.5px">Bayar Honor ${enumCount} Enumerator Sekaligus</h3>
+            <div class="small muted">Survei Lapangan — Total ${totalResp} Responden (Est. ${fmtRupiah(totalEst)})</div>
+          </div>
+          <button class="btn sm pri" onclick="openBatchHonorModal()">
+            ${svg('honor')} Gaji Massal
+          </button>
+        </div>
+      </div>
+
+      <!-- List cards with EXPLICIT EDIT BUTTONS -->
+      <div class="stack-sm">
+        ${filtered.length === 0 ? `<div class="card muted small">Belum ada personel pada kategori ini. Klik "+ Personel" di kanan atas untuk menambahkan.</div>` : filtered.map(t => renderTeamCard(t)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function setTimFilter(f) {
+  activeTimFilter = f;
+  renderView();
+}
+
+function renderTeamCard(t) {
+  const has16Digit = (t.nik && t.nik.length === 16);
+  const totalReceived = S.payroll.filter(h => h.teamId === t.id).reduce((s, x) => s + (x.bruto || 0), 0);
+  const target = Number(t.targetResponden) || 1;
+  const rate = Number(t.rateDefault) || 0;
+  const sat = t.unitDefault || 'OR';
+  const estTotal = target * rate;
+
+  return `
+    <div class="item-card">
+      <div class="row between">
+        <div class="row" style="gap:6px; flex-wrap:wrap">
+          <span class="badge ${t.role === 'Enumerator' ? 'ok' : (t.role === 'Narasumber' ? 'purple' : 'info')}">${t.role}</span>
+          <span class="badge warning">${target} ${sat}</span>
+          <span class="badge" style="background:var(--panel2); color:var(--ink-secondary)">@ ${fmtRupiah(rate)}</span>
+        </div>
+        <span class="small num">Total Terbayar: <b>${fmtRupiah(totalReceived)}</b></span>
+      </div>
+      
+      <div style="font-weight:750; font-size:15px; margin-top:2px">${t.name}</div>
+      
+      <div class="grid2 tiny muted" style="margin-top:2px; background:var(--panel2); padding:8px 10px; border-radius:8px">
+        <div>
+          <span>NIK (16 Digit):</span><br>
+          <b class="num" style="color:${has16Digit ? 'var(--ok)' : 'var(--warning)'}; font-size:12px">${t.nik || 'Belum diisi'}</b>
+        </div>
+        <div>
+          <span>NPWP:</span><br>
+          <b class="num" style="font-size:12px">${t.npwp || 'Non-NPWP'}</b>
+        </div>
+        <div style="margin-top:4px">
+          <span>Rekening Bank:</span><br>
+          <span class="num">${t.bank || '-'}</span>
+        </div>
+        <div style="margin-top:4px">
+          <span>WhatsApp / HP:</span><br>
+          <span class="num">${t.phone || '-'}</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div class="row between" style="margin-top:4px; padding-top:6px; border-top:1px solid var(--line)">
+        <div class="small muted">
+          Est. Honor: <b class="num in-c">${fmtRupiah(estTotal)}</b>
+        </div>
+        <div class="row">
+          <button class="btn sm" onclick="openAddHonorForMember('${t.id}')">
+            ${svg('honor')} Buat Slip
+          </button>
+          <button class="btn sm" onclick="openEditTeamModal('${t.id}')">
+            ${svg('edit')} Edit
+          </button>
+          <button class="iconbtn" style="width:34px; height:34px" onclick="deleteTeamMember('${t.id}')" title="Hapus Personel">
+            ${svg('trash')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================================
+   VIEW 4: HONOR (PENGGAJIAN, SLIP & BATCH GENERATOR)
+   ========================================================================= */
+function vHonor() {
+  const p = curProj();
+  if (!p) return `<div class="card">Pilih proyek terlebih dahulu.</div>`;
+  const pid = p.id;
+  const pays = S.payroll.filter(h => h.pid === pid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const totalBruto = pays.reduce((s, x) => s + (x.bruto || 0), 0);
+  const totalPph21 = pays.reduce((s, x) => s + (x.taxAmount || 0), 0);
+  const totalNetto = pays.reduce((s, x) => s + (x.netto || 0), 0);
+
+  return `
+    <div class="stack">
+      <div class="row between">
+        <div>
+          <h2>Penggajian & Honor</h2>
+          <div class="small muted">Slip Honorarium Pembantu Peneliti & Narasumber</div>
+        </div>
+        <div class="row">
+          <button class="btn sm" onclick="openBatchHonorModal()">Gaji Massal</button>
+          <button class="btn sm pri" onclick="openAddHonorModal()">+ Slip Baru</button>
+        </div>
+      </div>
+
+      <!-- Rekap Mini -->
+      <div class="grid3">
+        <div class="card">
+          <span class="lab">TOTAL BRUTO</span>
+          <div class="val num" style="font-size:17px">${fmtRupiah(totalBruto)}</div>
+        </div>
+        <div class="card">
+          <span class="lab">PPH 21 (5%)</span>
+          <div class="val num" style="font-size:17px; color:var(--warning)">${fmtRupiah(totalPph21)}</div>
+        </div>
+        <div class="card">
+          <span class="lab">TAKE HOME PAY</span>
+          <div class="val num" style="font-size:17px; color:var(--ok)">${fmtRupiah(totalNetto)}</div>
+        </div>
+      </div>
+
+      <!-- Quick Advice -->
+      <div class="card muted small" style="background:var(--panel2); border-left:4px solid var(--primary)">
+        💡 <b>Format Standar Kemendikbud/LPPM:</b> Potongan PPh 21 tarif 5% berlaku untuk bukan pegawai (pembantu peneliti & narasumber yang memiliki NIK/NPWP valid). Netto adalah dana riil yang ditransfer ke rekening penerima.
+      </div>
+
+      <!-- List of honor slips -->
+      <div class="stack-sm">
+        ${pays.length === 0 ? `<div class="card muted small">Belum ada slip honorarium. Buat slip baru atau gunakan gaji massal.</div>` : pays.map(h => renderPayrollCard(h)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderPayrollCard(h) {
+  return `
+    <div class="item-card">
+      <div class="row between">
+        <div class="row" style="gap:6px">
+          <span class="badge ${h.role === 'Enumerator' ? 'ok' : 'purple'}">${h.role || 'Honorarium'}</span>
+          <span class="small muted num">No. ${h.no || '-'}</span>
+        </div>
+        <span class="badge ${h.isPaid ? 'ok' : 'warning'}">${h.isPaid ? 'Lunas Ditransfer' : 'Draft'}</span>
+      </div>
+
+      <div style="font-weight:750; font-size:15px">${h.recipient}</div>
+      <div class="small muted">${h.activity}</div>
+
+      <div class="row between small num" style="background:var(--panel2); padding:6px 10px; border-radius:8px; margin-top:2px">
+        <div>Vol: <b>${h.qty} ${h.sat} @ ${fmtNum(h.price)}</b></div>
+        <div>Bruto: <b>${fmtRupiah(h.bruto)}</b></div>
+        <div>PPh 21: <b style="color:var(--warning)">${fmtRupiah(h.taxAmount)}</b></div>
+      </div>
+
+      <div class="row between" style="margin-top:2px; border-top:1px solid var(--line); padding-top:6px">
+        <div class="small muted">Netto: <b class="num" style="color:var(--ok); font-size:14.5px">${fmtRupiah(h.netto)}</b></div>
+        <div class="row">
+          <button class="btn sm" onclick="previewSlip('${h.id}')" title="Cetak Slip Tanda Terima">
+            ${svg('printer')} Cetak Slip
+          </button>
+          <button class="btn sm" onclick="openEditHonorModal('${h.id}')">
+            ${svg('edit')} Edit
+          </button>
+          <button class="iconbtn" style="width:34px;height:34px" onclick="deletePayrollSlip('${h.id}')" title="Hapus Slip">
+            ${svg('trash')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================================
+   VIEW 5: PAJAK & CORETAX (TAX CENTER & SPJ AUDIT)
+   ========================================================================= */
+function vPajak() {
+  const p = curProj();
+  if (!p) return `<div class="card">Pilih proyek terlebih dahulu.</div>`;
+  const pid = p.id;
+  const exps = S.expenses.filter(e => e.pid === pid);
+  const pays = S.payroll.filter(h => h.pid === pid);
+
+  const pph21Items = pays.filter(h => (h.taxAmount || 0) > 0);
+  const pph23Items = exps.filter(e => e.taxType === 'pph23');
+  const pph42Items = exps.filter(e => e.taxType === 'pph4_2');
+
+  const sumPph21 = pph21Items.reduce((s, x) => s + (x.taxAmount || 0), 0);
+  const sumPph23 = pph23Items.reduce((s, x) => s + (x.taxAmount || 0), 0);
+  const sumPph42 = pph42Items.reduce((s, x) => s + (x.taxAmount || 0), 0);
+
+  const aud = getAuditStats();
+
+  return `
+    <div class="stack">
+      <div class="row between">
+        <div>
+          <h2>Pusat Pajak & SPJ</h2>
+          <div class="small muted">Kepatuhan Pajak Coretax DJP & Kelengkapan Dokumen</div>
+        </div>
+        <button class="btn sm pri" onclick="exportCoretaxCSV()">
+          ${svg('download')} Ekspor Coretax
+        </button>
+      </div>
+
+      <!-- Segment Pajak Tabs -->
+      <div class="segment">
+        <button class="${activePajakTab === 'coretax' ? 'active' : ''}" onclick="setPajakTab('coretax')">Tabel Coretax DJP</button>
+        <button class="${activePajakTab === 'audit' ? 'active' : ''}" onclick="setPajakTab('audit')">Audit SPJ (${aud.fullyCompliant}/${aud.totalTrans})</button>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="grid3">
+        <div class="card">
+          <span class="lab">PPH 21 (HONOR)</span>
+          <div class="val num" style="font-size:16px; color:var(--info)">${fmtRupiah(sumPph21)}</div>
+          <div class="tiny muted">${pph21Items.length} Penerima Honor</div>
+        </div>
+        <div class="card">
+          <span class="lab">PPH 23 (SEWA KEND.)</span>
+          <div class="val num" style="font-size:16px; color:var(--purple)">${fmtRupiah(sumPph23)}</div>
+          <div class="tiny muted">${pph23Items.length} Transaksi Sewa</div>
+        </div>
+        <div class="card">
+          <span class="lab">PPH 4(2) (RUMAH)</span>
+          <div class="val num" style="font-size:16px; color:var(--warning)">${fmtRupiah(sumPph42)}</div>
+          <div class="tiny muted">${pph42Items.length} Sewa Posko (10%)</div>
+        </div>
+      </div>
+
+      ${activePajakTab === 'coretax' ? renderCoretaxTab(pph21Items, pph23Items, pph42Items) : renderAuditTab(exps, pays)}
+    </div>
+  `;
+}
+
+function setPajakTab(t) {
+  activePajakTab = t;
+  renderView();
+}
+
+function renderCoretaxTab(pph21Items, pph23Items, pph42Items) {
+  return `
+    <div class="stack-sm">
+      <div class="card muted small" style="background:var(--panel2); border-left:4px solid var(--info)">
+        🏛️ <b>Coretax DJP Integration:</b> Nomor Identitas Perpajakan (NPWP 16 digit / NIK KTP) otomatis disiapkan sesuai format e-Bupot & Coretax DJP. Klik tombol <b>Ekspor Coretax</b> untuk mengunduh CSV siap impor.
+      </div>
+
+      <div class="row between">
+        <h3>Daftar Objek Pemotongan Pajak</h3>
+        <button class="pill" onclick="exportCoretaxCSV()">Unduh CSV Coretax</button>
+      </div>
+
+      <!-- PPh 21 (Honorarium) -->
+      <div class="card">
+        <div class="row between" style="margin-bottom:8px">
+          <b>PPh Pasal 21 — Honor Narasumber & Pembantu Peneliti (21-100-02)</b>
+          <span class="badge info">Tarif 5%</span>
+        </div>
+        <div class="stack-sm">
+          ${pph21Items.map(h => `
+            <div class="row between small" style="border-bottom:1px solid var(--line); padding:6px 0">
+              <div>
+                <div style="font-weight:700">${h.recipient}</div>
+                <div class="tiny muted num">NIK/NPWP: ${h.npwp || h.nik} · ${h.activity}</div>
+              </div>
+              <div class="text-right num">
+                <div class="muted">DPP: ${fmtRupiah(h.bruto)}</div>
+                <b style="color:var(--warning)">Potong: ${fmtRupiah(h.taxAmount)}</b>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- PPh 23 (Sewa Alat/Mobil/Motor) -->
+      <div class="card">
+        <div class="row between" style="margin-bottom:8px">
+          <b>PPh Pasal 23 — Sewa Kendaraan / Jasa (24-104-01)</b>
+          <span class="badge purple">Tarif 2%</span>
+        </div>
+        <div class="stack-sm">
+          ${pph23Items.map(e => `
+            <div class="row between small" style="border-bottom:1px solid var(--line); padding:6px 0">
+              <div>
+                <div style="font-weight:700">${e.item}</div>
+                <div class="tiny muted num">Penerima: ${e.recipient} (${e.recipientNpwp || e.recipientNik})</div>
+              </div>
+              <div class="text-right num">
+                <div class="muted">DPP: ${fmtRupiah(e.total)}</div>
+                <b style="color:var(--warning)">Potong: ${fmtRupiah(e.taxAmount)}</b>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- PPh Final 4(2) (Sewa Rumah) -->
+      <div class="card">
+        <div class="row between" style="margin-bottom:8px">
+          <b>PPh Final Pasal 4 ayat (2) — Sewa Posko/Rumah (28-403-01)</b>
+          <span class="badge warning">Tarif 10%</span>
+        </div>
+        <div class="stack-sm">
+          ${pph42Items.map(e => `
+            <div class="row between small" style="border-bottom:1px solid var(--line); padding:6px 0">
+              <div>
+                <div style="font-weight:700">${e.item}</div>
+                <div class="tiny muted num">Penerima: ${e.recipient} (${e.recipientNik})</div>
+              </div>
+              <div class="text-right num">
+                <div class="muted">DPP: ${fmtRupiah(e.total)}</div>
+                <b style="color:var(--warning)">Potong: ${fmtRupiah(e.taxAmount)}</b>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAuditTab(exps, pays) {
+  return `
+    <div class="stack-sm">
+      <div class="card muted small" style="background:var(--panel2); border-left:4px solid var(--ok)">
+        📋 <b>Standar SPJ Audit BPK/Kemendikbud (dari Dokumen PDF 33 Halaman):</b><br>
+        1. <b>Konsumsi:</b> Kuitansi, NIK Penjual, Daftar Hadir Peserta, Notulensi, Foto Dokumentasi.<br>
+        2. <b>Narasumber:</b> Surat Undangan, CV, Bahan Paparan, NPWP/NIK, Kwitansi Honor, Surat Kesediaan, Daftar Hadir, Timestamp Foto.<br>
+        3. <b>Sewa Rumah:</b> Kontrak Sewa Bermaterai + KTP Pemilik, Kuitansi, Foto Rumah Timestamp.<br>
+        4. <b>Sewa Kendaraan:</b> Kontrak Sewa Bermaterai + KTP, STNK Kendaraan, Surat Non-PKP, Kuitansi, Foto Timestamp.
+      </div>
+
+      <div class="stack-sm">
+        ${exps.map(e => renderAuditExpItem(e)).join('')}
+        ${pays.map(h => renderAuditPayItem(h)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderAuditExpItem(e) {
+  const d = e.docs || {};
+  let reqs = [];
+  if (e.cat === 'Konsumsi') {
+    reqs = [['kuitansi', 'Kuitansi Asli'], ['nik_penjual', 'NIK Penjual'], ['daftar_hadir', 'Daftar Hadir'], ['notulensi', 'Notulensi'], ['foto_timestamp', 'Foto Dokumentasi']];
+  } else if (e.cat === 'Sewa Kendaraan') {
+    reqs = [['kuitansi', 'Kuitansi'], ['kontrak', 'Kontrak Bermaterai'], ['stnk', 'STNK Kendaraan'], ['non_pkp', 'Surat Non-PKP'], ['foto_timestamp', 'Foto Timestamp']];
+  } else if (e.cat === 'Sewa Rumah') {
+    reqs = [['kuitansi', 'Kuitansi'], ['kontrak', 'Kontrak Bermaterai'], ['ktp', 'KTP Pemilik'], ['foto_timestamp', 'Foto Rumah Timestamp']];
+  } else {
+    reqs = [['kuitansi', 'Kuitansi Pembayaran'], ['foto_timestamp', 'Bukti / Dokumentasi']];
+  }
+
+  const passed = reqs.filter(([k]) => d[k]).length;
+  const isOk = passed === reqs.length;
+
+  return `
+    <div class="item-card" onclick="openAuditExpModal('${e.id}')">
+      <div class="row between">
+        <span class="badge info">${e.cat}</span>
+        <span class="badge ${isOk ? 'ok' : 'warning'}">${passed}/${reqs.length} ${isOk ? 'Lengkap' : 'Perlu Lengkapi'}</span>
+      </div>
+      <div style="font-weight:700; font-size:14px">${e.item}</div>
+      <div class="row small muted" style="flex-wrap:wrap; gap:6px; margin-top:2px">
+        ${reqs.map(([k, label]) => `
+          <span style="display:inline-flex; align-items:center; gap:3px; color:${d[k] ? 'var(--ok)' : 'var(--muted)'}">
+            ${d[k] ? '✓' : '✗'} ${label}
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderAuditPayItem(h) {
+  const d = h.docs || {};
+  let reqs = [];
+  if (h.role === 'Narasumber') {
+    reqs = [['undangan', 'Undangan'], ['cv', 'CV/Biodata'], ['materi', 'Bahan Paparan'], ['npwp', 'NPWP/NIK'], ['kwitansi', 'Kwitansi Honor'], ['kesediaan', 'Surat Kesediaan'], ['daftar_hadir', 'Daftar Hadir'], ['foto', 'Foto Timestamp']];
+  } else {
+    reqs = [['kwitansi', 'Kwitansi/Tanda Terima'], ['daftar_hadir', 'Daftar Hadir/Output Kerja'], ['npwp', 'NPWP/NIK']];
+  }
+
+  const passed = reqs.filter(([k]) => d[k]).length;
+  const isOk = passed === reqs.length;
+
+  return `
+    <div class="item-card" onclick="openAuditPayModal('${h.id}')">
+      <div class="row between">
+        <span class="badge purple">${h.role}</span>
+        <span class="badge ${isOk ? 'ok' : 'warning'}">${passed}/${reqs.length} ${isOk ? 'Lengkap' : 'Perlu Lengkapi'}</span>
+      </div>
+      <div style="font-weight:700; font-size:14px">${h.recipient} — ${h.activity}</div>
+      <div class="row small muted" style="flex-wrap:wrap; gap:6px; margin-top:2px">
+        ${reqs.map(([k, label]) => `
+          <span style="display:inline-flex; align-items:center; gap:3px; color:${d[k] ? 'var(--ok)' : 'var(--muted)'}">
+            ${d[k] ? '✓' : '✗'} ${label}
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================================
+   MODALS & ACTIONS
+   ========================================================================= */
+
+// Project Modal
+function openProjectModal() {
+  const cur = curProj();
+  const html = `
+    <div class="stack">
+      <div class="card" style="background:var(--panel2); border-color:var(--primary)">
+        <div class="row between">
+          <b>Proyek Aktif Saat Ini:</b>
+          <button class="btn sm" onclick="openEditProjectModal('${cur ? cur.id : ''}')">${svg('edit')} Edit Detail Proyek</button>
+        </div>
+        <div style="font-weight:750; font-size:15px; margin-top:6px">${cur ? cur.name : '-'}</div>
+        <div class="small muted">${cur ? cur.leader + ' · ' + cur.institution + ' (' + cur.year + ')' : ''}</div>
+        <div class="small num muted" style="margin-top:2px">Plafon: ${cur ? fmtRupiah(cur.budgetTotal) : '-'} · ${cur ? cur.bankName + ' (' + cur.bankAcc + ')' : ''}</div>
+      </div>
+
+      <div class="stack-sm">
+        <b class="small muted">Daftar Semua Proyek Riset:</b>
+        ${S.projects.map(p => `
+          <div class="item-card ${p.id === S.activeId ? 'selected' : ''}" style="border-color:${p.id === S.activeId ? 'var(--primary)' : 'var(--line)'}" onclick="switchProject('${p.id}')">
+            <div class="row between">
+              <b>${p.name}</b>
+              ${p.id === S.activeId ? `<span class="badge ok">Aktif</span>` : ''}
+            </div>
+            <div class="small muted">${p.leader} · ${p.institution} (${p.year})</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <button class="btn block pri" onclick="openAddProjectModal()">+ Tambah Proyek Riset Baru</button>
+
+      <div class="row between" style="margin-top:8px; border-top:1px solid var(--line); padding-top:10px">
+        <button class="btn sm" onclick="reloadSampleData()">📥 Muat Ulang Data Sampel</button>
+        <button class="btn sm bad" onclick="clearAllData()">🗑️ Kosongkan Data</button>
+      </div>
+    </div>
+  `;
+  openSheet('Kelola Proyek Penelitian', html, 'Tutup', () => true);
+}
+
+function openEditProjectModal(pid) {
+  const p = S.projects.find(x => x.id === pid) || curProj();
+  if (!p) return;
+
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Judul Riset / Proyek</label>
+        <input id="edit_p_name" value="${p.name}">
+      </div>
+      <div class="field">
+        <label>Ketua Peneliti</label>
+        <input id="edit_p_leader" value="${p.leader}">
+      </div>
+      <div class="field">
+        <label>Institusi / Skema Hibah</label>
+        <input id="edit_p_inst" value="${p.institution || ''}">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Tahun Anggaran</label>
+          <input id="edit_p_year" value="${p.year || '2026'}">
+        </div>
+        <div class="field">
+          <label>Total Plafon Anggaran (Rp)</label>
+          <input id="edit_p_budget" class="num" value="${fmtNum(p.budgetTotal)}" oninput="this.value = fmtNum(parseNum(this.value))">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Nama Bank Penampung</label>
+          <input id="edit_p_bank" value="${p.bankName || ''}">
+        </div>
+        <div class="field">
+          <label>Nomor Rekening</label>
+          <input id="edit_p_acc" class="num" value="${p.bankAcc || ''}">
+        </div>
+      </div>
+    </div>
+  `;
+
+  openSheet('Ubah Data Proyek Penelitian', html, 'Simpan Perubahan', () => {
+    p.name = document.getElementById('edit_p_name').value.trim() || p.name;
+    p.leader = document.getElementById('edit_p_leader').value.trim() || p.leader;
+    p.institution = document.getElementById('edit_p_inst').value.trim() || p.institution;
+    p.year = document.getElementById('edit_p_year').value.trim() || p.year;
+    p.budgetTotal = parseNum(document.getElementById('edit_p_budget').value) || p.budgetTotal;
+    p.bankName = document.getElementById('edit_p_bank').value.trim() || p.bankName;
+    p.bankAcc = document.getElementById('edit_p_acc').value.trim() || p.bankAcc;
+
+    saveState();
+    renderHeader();
+    renderView();
+    toast('Data proyek penelitian berhasil diperbarui!');
+    return true;
+  });
+}
+
+function reloadSampleData() {
+  if (!confirm('Muat ulang data sampel riset Bu Nadhiroh? Perubahan lokal akan ditimpa data awal.')) return;
+  S = defaultSeed();
+  saveState();
+  closeSheet();
+  renderHeader();
+  renderView();
+  toast('Data sampel riset berhasil dimuat ulang!');
+}
+
+function clearAllData() {
+  if (!confirm('Yakin ingin mengosongkan semua data penelitian?')) return;
+  const pid = 'proj_' + Date.now();
+  S = {
+    v: 1,
+    activeId: pid,
+    projects: [{
+      id: pid,
+      name: 'Proyek Riset Baru',
+      leader: 'Ketua Peneliti',
+      institution: 'Kemendikbudristek',
+      year: '2026',
+      budgetTotal: 100000000,
+      bankName: 'Bank',
+      bankAcc: '-'
+    }],
+    inflows: [],
+    team: [],
+    expenses: [],
+    payroll: []
+  };
+  saveState();
+  closeSheet();
+  renderHeader();
+  renderView();
+  toast('Data berhasil dikosongkan. Siap untuk input baru!');
+}
+
+function switchProject(pid) {
+  S.activeId = pid;
+  saveState();
+  closeSheet();
+  renderHeader();
+  renderView();
+  toast('Proyek berhasil diganti.');
+}
+
+function openAddProjectModal() {
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Judul Riset / Proyek</label>
+        <input id="inp_p_name" placeholder="misal: Riset Inovasi Pertanian Berkelanjutan 2026">
+      </div>
+      <div class="field">
+        <label>Ketua Peneliti</label>
+        <input id="inp_p_leader" placeholder="Nama lengkap + gelar">
+      </div>
+      <div class="field">
+        <label>Institusi / Skema Hibah</label>
+        <input id="inp_p_inst" placeholder="DRTPM / BRIN / LPDP / Universitas">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Tahun Anggaran</label>
+          <input id="inp_p_year" value="2026">
+        </div>
+        <div class="field">
+          <label>Total Plafon Anggaran (Rp)</label>
+          <input id="inp_p_budget" class="num" placeholder="100000000" oninput="this.value = fmtNum(parseNum(this.value))">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Nama Bank Penampung</label>
+          <input id="inp_p_bank" placeholder="BNI / Mandiri / BRI">
+        </div>
+        <div class="field">
+          <label>Nomor Rekening</label>
+          <input id="inp_p_acc" class="num" placeholder="0123456789">
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Tambah Proyek Penelitian', html, 'Simpan Proyek', () => {
+    const name = document.getElementById('inp_p_name').value.trim();
+    if (!name) { toast('Judul proyek tidak boleh kosong'); return false; }
+    const leader = document.getElementById('inp_p_leader').value.trim();
+    const inst = document.getElementById('inp_p_inst').value.trim();
+    const year = document.getElementById('inp_p_year').value.trim() || '2026';
+    const budget = parseNum(document.getElementById('inp_p_budget').value);
+    const bank = document.getElementById('inp_p_bank').value.trim();
+    const acc = document.getElementById('inp_p_acc').value.trim();
+
+    const newId = 'proj_' + Date.now();
+    S.projects.push({
+      id: newId,
+      name,
+      leader: leader || 'Ketua Peneliti',
+      institution: inst || 'Kemendikbudristek',
+      year,
+      budgetTotal: budget || 100000000,
+      bankName: bank || 'Bank Penampung',
+      bankAcc: acc || '-',
+      bankHolder: leader || 'Ketua Peneliti'
+    });
+    S.activeId = newId;
+    saveState();
+    renderHeader();
+    renderView();
+    toast('Proyek baru berhasil dibuat!');
+    return true;
+  });
+}
+
+// Add Inflow Modal
+function openAddInflowModal() {
+  const p = curProj();
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Tahap / Termin Pencairan</label>
+        <input id="inp_in_termin" placeholder="Contoh: Termin 1 (70%) atau Termin 2 (30%)">
+      </div>
+      <div class="field">
+        <label>Nominal Dana Masuk (Rp)</label>
+        <input id="inp_in_amount" class="num" placeholder="0" oninput="this.value = fmtNum(parseNum(this.value))">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Tanggal Masuk / SP2D</label>
+          <input id="inp_in_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="field">
+          <label>Nomor SP2D / Bukti Bank</label>
+          <input id="inp_in_sp2d" placeholder="SP2D-xxx">
+        </div>
+      </div>
+      <div class="field">
+        <label>Sumber Pendanaan</label>
+        <input id="inp_in_source" value="${p ? p.institution : 'DRTPM Kemendikbudristek'}">
+      </div>
+      <div class="field">
+        <label>Catatan Tambahan</label>
+        <textarea id="inp_in_note" rows="2" placeholder="Keterangan transfer"></textarea>
+      </div>
+    </div>
+  `;
+  openSheet('Catat Dana Masuk Hibah', html, 'Simpan Dana Masuk', () => {
+    const termin = document.getElementById('inp_in_termin').value.trim() || 'Termin Hibah';
+    const amount = parseNum(document.getElementById('inp_in_amount').value);
+    if (!amount) { toast('Nominal dana masuk tidak boleh 0'); return false; }
+    const date = document.getElementById('inp_in_date').value;
+    const sp2d = document.getElementById('inp_in_sp2d').value.trim();
+    const source = document.getElementById('inp_in_source').value.trim();
+    const note = document.getElementById('inp_in_note').value.trim();
+
+    S.inflows.push({
+      id: 'in_' + Date.now(),
+      pid: p.id,
+      date,
+      termin,
+      amount,
+      source,
+      sp2dNo: sp2d,
+      note
+    });
+    saveState();
+    renderView();
+    toast('Dana masuk berhasil dicatat!');
+    return true;
+  });
+}
+
+// Add Expense Modal
+function openAddExpenseModal() {
+  const p = curProj();
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Kategori Pengeluaran RAB</label>
+        <select id="inp_exp_cat" onchange="autoCalcExpenseTax()">
+          <option value="Konsumsi">Konsumsi FGD / Rapat / Workshop</option>
+          <option value="Sewa Kendaraan">Sewa Kendaraan (Mobil / Motor)</option>
+          <option value="Sewa Rumah">Sewa Rumah Basecamp Lapangan</option>
+          <option value="Transport">Transportasi Operasional Lapangan</option>
+          <option value="Analisis Data">Analisis Data / Lab</option>
+          <option value="Bahan Habis Pakai">Bahan Habis Pakai / ATK</option>
+          <option value="Publikasi">Publikasi / Diseminasi</option>
+          <option value="Lainnya">Lain-lain</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Uraian Belanja / Kegiatan</label>
+        <input id="inp_exp_item" placeholder="misal: Konsumsi Edukasi Gizi 1 (Makan Rapat)">
+      </div>
+
+      <div class="grid3">
+        <div class="field">
+          <label>Volume</label>
+          <input id="inp_exp_qty" class="num" type="number" value="1" oninput="autoCalcExpenseTax()">
+        </div>
+        <div class="field">
+          <label>Satuan</label>
+          <input id="inp_exp_sat" value="Paket">
+        </div>
+        <div class="field">
+          <label>Harga Satuan (Rp)</label>
+          <input id="inp_exp_price" class="num" placeholder="0" oninput="this.value = fmtNum(parseNum(this.value)); autoCalcExpenseTax()">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Total Bruto (Rp)</label>
+          <input id="inp_exp_total" class="num" readonly style="font-weight:700">
+        </div>
+        <div class="field">
+          <label>Tanggal Transaksi</label>
+          <input id="inp_exp_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Penerima / Vendor</label>
+          <input id="inp_exp_rec" placeholder="Nama toko / katering / pemilik">
+        </div>
+        <div class="field">
+          <label>NIK / NPWP 16 Digit Penerima</label>
+          <input id="inp_exp_nik" class="num" placeholder="16 digit NIK KTP">
+        </div>
+      </div>
+
+      <!-- Live Tax Calculation -->
+      <div class="card" style="background:var(--panel2)">
+        <div class="row between">
+          <span class="small muted">Perhitungan Pajak Coretax:</span>
+          <select id="inp_exp_tax_type" style="padding:4px 8px; font-size:12px" onchange="autoCalcExpenseTax()">
+            <option value="none">Tanpa Potongan / Non-PKP</option>
+            <option value="pph23">PPh 23 Sewa Kendaraan (2%)</option>
+            <option value="pph4_2">PPh Final 4(2) Sewa Rumah (10%)</option>
+            <option value="pph21">PPh 21 Jasa Lainnya (5%)</option>
+          </select>
+        </div>
+        <div class="row between" style="margin-top:8px">
+          <div>Potongan Pajak: <b class="num" id="lbl_exp_tax" style="color:var(--warning)">Rp 0</b></div>
+          <div>Netto Dibayar: <b class="num" id="lbl_exp_net" style="color:var(--ok)">Rp 0</b></div>
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Tambah Pengeluaran Belanja', html, 'Simpan Pengeluaran', () => {
+    const cat = document.getElementById('inp_exp_cat').value;
+    const item = document.getElementById('inp_exp_item').value.trim();
+    if (!item) { toast('Uraian belanja wajib diisi'); return false; }
+    const qty = Number(document.getElementById('inp_exp_qty').value) || 1;
+    const sat = document.getElementById('inp_exp_sat').value.trim() || 'Unit';
+    const price = parseNum(document.getElementById('inp_exp_price').value);
+    const total = qty * price;
+    if (!total) { toast('Total belanja tidak boleh 0'); return false; }
+    const date = document.getElementById('inp_exp_date').value;
+    const rec = document.getElementById('inp_exp_rec').value.trim() || 'Pihak Ketiga';
+    const nik = document.getElementById('inp_exp_nik').value.trim();
+
+    const taxType = document.getElementById('inp_exp_tax_type').value;
+    let taxRate = 0;
+    if (taxType === 'pph23') taxRate = 0.02;
+    if (taxType === 'pph4_2') taxRate = 0.10;
+    if (taxType === 'pph21') taxRate = 0.05;
+    const taxAmount = Math.round(total * taxRate);
+    const netAmount = total - taxAmount;
+
+    S.expenses.push({
+      id: 'exp_' + Date.now(),
+      pid: p.id,
+      no: String(S.expenses.length + 1),
+      date,
+      cat,
+      item,
+      sat,
+      qty,
+      price,
+      total,
+      recipient: rec,
+      recipientNik: nik,
+      taxType,
+      taxRate,
+      taxAmount,
+      netAmount,
+      docs: { kuitansi: true }
+    });
+    saveState();
+    renderView();
+    toast('Pengeluaran berhasil disimpan!');
+    return true;
+  });
+
+  setTimeout(() => autoCalcExpenseTax(), 50);
+}
+
+function autoCalcExpenseTax() {
+  const cat = document.getElementById('inp_exp_cat')?.value;
+  const qty = Number(document.getElementById('inp_exp_qty')?.value) || 1;
+  const price = parseNum(document.getElementById('inp_exp_price')?.value);
+  const total = qty * price;
+
+  const totalEl = document.getElementById('inp_exp_total');
+  if (totalEl) totalEl.value = fmtRupiah(total);
+
+  const taxSel = document.getElementById('inp_exp_tax_type');
+  if (taxSel && !taxSel.dataset.manual) {
+    if (cat === 'Sewa Kendaraan') taxSel.value = 'pph23';
+    else if (cat === 'Sewa Rumah') taxSel.value = 'pph4_2';
+    else if (cat === 'Konsumsi') taxSel.value = 'none';
+  }
+
+  const taxType = taxSel ? taxSel.value : 'none';
+  let rate = 0;
+  if (taxType === 'pph23') rate = 0.02;
+  if (taxType === 'pph4_2') rate = 0.10;
+  if (taxType === 'pph21') rate = 0.05;
+
+  const tax = Math.round(total * rate);
+  const net = total - tax;
+
+  const lblTax = document.getElementById('lbl_exp_tax');
+  const lblNet = document.getElementById('lbl_exp_net');
+  if (lblTax) lblTax.textContent = fmtRupiah(tax);
+  if (lblNet) lblNet.textContent = fmtRupiah(net);
+}
+
+// Batch Honor Generator for Enumerators
+function openBatchHonorModal() {
+  const p = curProj();
+  const enums = S.team.filter(t => t.pid === p.id && t.role === 'Enumerator');
+  const defaultRate = enums.length ? (enums[0].rateDefault || 8000) : 8000;
+  const defaultQty = enums.length ? (enums[0].targetResponden || 20) : 20;
+
+  const html = `
+    <div class="stack">
+      <div class="card muted small" style="background:var(--panel2); border-left:4px solid var(--primary)">
+        👥 <b>Otomatisasi Penggajian Enumerator:</b><br>
+        Menghasilkan slip honor individu untuk ${enums.length} enumerator secara serentak. Tiap personel dihitung bruto, potongan PPh 21 (5%), dan take home pay.
+      </div>
+
+      <div class="field">
+        <label>Uraian Kegiatan Survei</label>
+        <input id="inp_b_activity" value="Honor Petugas Survei Rumah Tangga">
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Target Responden per Orang</label>
+          <input id="inp_b_qty" class="num" type="number" value="${defaultQty}" oninput="calcBatchTotal()">
+        </div>
+        <div class="field">
+          <label>Tarif per Responden (Rp)</label>
+          <input id="inp_b_rate" class="num" value="${fmtNum(defaultRate)}" oninput="this.value = fmtNum(parseNum(this.value)); calcBatchTotal()">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Tanggal Pembayaran</label>
+        <input id="inp_b_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+      </div>
+
+      <div class="card" style="background:var(--panel2)">
+        <b>Daftar ${enums.length} Enumerator yang akan diproses:</b>
+        <div class="stack-sm tiny num muted" style="margin-top:6px; max-height:120px; overflow-y:auto">
+          ${enums.map((e, idx) => `<div>${idx+1}. ${e.name} (Target: ${e.targetResponden || 20} resp @ ${fmtRupiah(e.rateDefault || 8000)})</div>`).join('')}
+        </div>
+        <div class="row between" style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px">
+          <div>Total Bruto: <b class="num" id="lbl_b_bruto">Rp 0</b></div>
+          <div>Total PPh 21 (5%): <b class="num" id="lbl_b_tax" style="color:var(--warning)">Rp 0</b></div>
+        </div>
+        <div class="row between" style="margin-top:4px">
+          <div>Take Home Pay Total: <b class="num" id="lbl_b_net" style="color:var(--ok)">Rp 0</b></div>
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Gaji Massal Enumerator', html, `Proses & Terbitkan ${enums.length} Slip`, () => {
+    const act = document.getElementById('inp_b_activity').value.trim() || 'Honor Petugas Survei';
+    const qty = Number(document.getElementById('inp_b_qty').value) || 20;
+    const rate = parseNum(document.getElementById('inp_b_rate').value) || 8000;
+    const date = document.getElementById('inp_b_date').value;
+
+    enums.forEach((t, i) => {
+      const pQty = t.targetResponden || qty;
+      const pRate = t.rateDefault || rate;
+      const brutoPerPerson = pQty * pRate;
+      const taxPerPerson = Math.round(brutoPerPerson * 0.05);
+      const netPerPerson = brutoPerPerson - taxPerPerson;
+
+      S.payroll.push({
+        id: 'pay_gen_' + Date.now() + '_' + i,
+        pid: p.id,
+        no: '56-' + (S.payroll.length + 1),
+        teamId: t.id,
+        recipient: t.name,
+        role: t.role,
+        nik: t.nik,
+        npwp: t.npwp,
+        activity: act + ` (${pQty} Responden)`,
+        sat: 'OR',
+        qty: pQty,
+        price: pRate,
+        bruto: brutoPerPerson,
+        taxRate: 0.05,
+        taxAmount: taxPerPerson,
+        netto: netPerPerson,
+        date: date,
+        isPaid: true,
+        docs: { kwitansi: true, daftar_hadir: true, npwp: true }
+      });
+    });
+
+    saveState();
+    setView('honor');
+    toast(`Berhasil menerbitkan ${enums.length} slip honorarium enumerator!`);
+    return true;
+  });
+
+  setTimeout(() => calcBatchTotal(), 50);
+}
+
+function calcBatchTotal() {
+  const p = curProj();
+  const count = S.team.filter(t => t.pid === p.id && t.role === 'Enumerator').length || 8;
+  const qty = Number(document.getElementById('inp_b_qty')?.value) || 20;
+  const rate = parseNum(document.getElementById('inp_b_rate')?.value) || 8000;
+
+  const totalBruto = count * qty * rate;
+  const totalTax = Math.round(totalBruto * 0.05);
+  const totalNet = totalBruto - totalTax;
+
+  const bBruto = document.getElementById('lbl_b_bruto');
+  const bTax = document.getElementById('lbl_b_tax');
+  const bNet = document.getElementById('lbl_b_net');
+  if (bBruto) bBruto.textContent = fmtRupiah(totalBruto);
+  if (bTax) bTax.textContent = fmtRupiah(totalTax);
+  if (bNet) bNet.textContent = fmtRupiah(totalNet);
+}
+
+// Add Team Member Modal
+function openAddTeamModal() {
+  const p = curProj();
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Nama Lengkap & Gelar</label>
+        <input id="inp_tm_name" placeholder="misal: Dr. Budi Santoso, M.Si">
+      </div>
+      <div class="field">
+        <label>Peran dalam Riset</label>
+        <select id="inp_tm_role">
+          <option value="Enumerator">Petugas Survei / Enumerator</option>
+          <option value="Pengolah Data">Asisten Peneliti / Pengolah Data</option>
+          <option value="Narasumber">Pakar / Narasumber Ahli</option>
+          <option value="Driver / Rental Transport">Driver / Logistik Transport</option>
+          <option value="Katering Konsumsi">Vendor Katering / Konsumsi</option>
+          <option value="Tenaga Lapangan">Tenaga Lapangan Lainnya</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Target Beban (misal: 20 resp)</label>
+          <input id="inp_tm_target" class="num" type="number" value="20">
+        </div>
+        <div class="field">
+          <label>Satuan Beban</label>
+          <select id="inp_tm_sat">
+            <option value="OR">OR (Orang-Responden)</option>
+            <option value="OK">OK (Orang-Kegiatan)</option>
+            <option value="OJ">OJ (Orang-Jam)</option>
+            <option value="OH">OH (Orang-Hari)</option>
+            <option value="OB">OB (Orang-Bulan)</option>
+            <option value="Paket">Paket</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Tarif Honor per Satuan (Rp)</label>
+        <input id="inp_tm_rate" class="num" value="8.000" oninput="this.value = fmtNum(parseNum(this.value))">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>NIK KTP (16 Digit Wajib)</label>
+          <input id="inp_tm_nik" class="num" maxlength="16" placeholder="3578xxxxxxxxxxxx">
+        </div>
+        <div class="field">
+          <label>NPWP</label>
+          <input id="inp_tm_npwp" class="num" placeholder="00.000.000.0-000.000">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Bank & Nomor Rekening</label>
+          <input id="inp_tm_bank" placeholder="Mandiri - 14200xxxx">
+        </div>
+        <div class="field">
+          <label>Nomor WhatsApp</label>
+          <input id="inp_tm_phone" class="num" placeholder="08xxxxxxxxxx">
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Tambah Personel / Pembantu Riset', html, 'Simpan Personel', () => {
+    const name = document.getElementById('inp_tm_name').value.trim();
+    if (!name) { toast('Nama personel tidak boleh kosong'); return false; }
+    const role = document.getElementById('inp_tm_role').value;
+    const target = Number(document.getElementById('inp_tm_target').value) || 1;
+    const sat = document.getElementById('inp_tm_sat').value;
+    const rate = parseNum(document.getElementById('inp_tm_rate').value) || 0;
+    const nik = document.getElementById('inp_tm_nik').value.trim();
+    const npwp = document.getElementById('inp_tm_npwp').value.trim() || nik;
+    const bank = document.getElementById('inp_tm_bank').value.trim();
+    const phone = document.getElementById('inp_tm_phone').value.trim();
+
+    S.team.push({
+      id: 'tm_' + Date.now(),
+      pid: p.id,
+      name,
+      role,
+      targetResponden: target,
+      unitDefault: sat,
+      rateDefault: rate,
+      nik,
+      npwp,
+      bank,
+      phone
+    });
+    saveState();
+    renderView();
+    toast('Personel berhasil ditambahkan!');
+    return true;
+  });
+}
+
+// Edit Team Member Modal (Fully editable!)
+function openEditTeamModal(id) {
+  const t = S.team.find(x => x.id === id);
+  if (!t) return;
+
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Nama Lengkap & Gelar</label>
+        <input id="edit_tm_name" value="${t.name}">
+      </div>
+      <div class="field">
+        <label>Peran dalam Riset</label>
+        <select id="edit_tm_role">
+          <option value="Enumerator" ${t.role === 'Enumerator' ? 'selected' : ''}>Petugas Survei / Enumerator</option>
+          <option value="Pengolah Data" ${t.role.includes('Pengolah') ? 'selected' : ''}>Asisten Peneliti / Pengolah Data</option>
+          <option value="Narasumber" ${t.role === 'Narasumber' ? 'selected' : ''}>Pakar / Narasumber Ahli</option>
+          <option value="Driver / Rental Transport" ${t.role.includes('Driver') ? 'selected' : ''}>Driver / Logistik Transport</option>
+          <option value="Katering Konsumsi" ${t.role.includes('Katering') ? 'selected' : ''}>Vendor Katering / Konsumsi</option>
+          <option value="Tenaga Lapangan" ${t.role.includes('Tenaga') ? 'selected' : ''}>Tenaga Lapangan Lainnya</option>
+        </select>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Target Beban Kerja</label>
+          <input id="edit_tm_target" class="num" type="number" value="${t.targetResponden || 1}" oninput="calcEditTeamLive()">
+        </div>
+        <div class="field">
+          <label>Satuan</label>
+          <select id="edit_tm_sat">
+            <option value="OR" ${t.unitDefault === 'OR' ? 'selected' : ''}>OR (Orang-Responden)</option>
+            <option value="OK" ${t.unitDefault === 'OK' ? 'selected' : ''}>OK (Orang-Kegiatan)</option>
+            <option value="OJ" ${t.unitDefault === 'OJ' ? 'selected' : ''}>OJ (Orang-Jam)</option>
+            <option value="OH" ${t.unitDefault === 'OH' ? 'selected' : ''}>OH (Orang-Hari)</option>
+            <option value="OB" ${t.unitDefault === 'OB' ? 'selected' : ''}>OB (Orang-Bulan)</option>
+            <option value="Paket" ${t.unitDefault === 'Paket' ? 'selected' : ''}>Paket</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Tarif Honor per Satuan (Rp)</label>
+        <input id="edit_tm_rate" class="num" value="${fmtNum(t.rateDefault || 0)}" oninput="this.value = fmtNum(parseNum(this.value)); calcEditTeamLive()">
+      </div>
+
+      <div class="card" style="background:var(--panel2)">
+        <div class="row between small">
+          <span>Estimasi Bruto:</span>
+          <b class="num" id="lbl_tm_bruto">Rp 0</b>
+        </div>
+        <div class="row between small" style="margin-top:2px">
+          <span>Potongan PPh 21 (5%):</span>
+          <b class="num" id="lbl_tm_tax" style="color:var(--warning)">Rp 0</b>
+        </div>
+        <div class="row between small" style="margin-top:4px; border-top:1px solid var(--line); padding-top:4px">
+          <span>Estimasi Netto (Take Home):</span>
+          <b class="num in-c" id="lbl_tm_net">Rp 0</b>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>NIK KTP (16 Digit Wajib)</label>
+          <input id="edit_tm_nik" class="num" maxlength="16" value="${t.nik || ''}">
+        </div>
+        <div class="field">
+          <label>NPWP</label>
+          <input id="edit_tm_npwp" class="num" value="${t.npwp || ''}">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Rekening Bank</label>
+          <input id="edit_tm_bank" value="${t.bank || ''}">
+        </div>
+        <div class="field">
+          <label>No WhatsApp</label>
+          <input id="edit_tm_phone" class="num" value="${t.phone || ''}">
+        </div>
+      </div>
+
+      <button class="btn block bad" onclick="deleteTeamMember('${t.id}')">Hapus Personel Ini</button>
+    </div>
+  `;
+
+  openSheet('Ubah Data Personel', html, 'Simpan Perubahan', () => {
+    t.name = document.getElementById('edit_tm_name').value.trim() || t.name;
+    t.role = document.getElementById('edit_tm_role').value;
+    t.targetResponden = Number(document.getElementById('edit_tm_target').value) || 1;
+    t.unitDefault = document.getElementById('edit_tm_sat').value;
+    t.rateDefault = parseNum(document.getElementById('edit_tm_rate').value) || 0;
+    t.nik = document.getElementById('edit_tm_nik').value.trim();
+    t.npwp = document.getElementById('edit_tm_npwp').value.trim();
+    t.bank = document.getElementById('edit_tm_bank').value.trim();
+    t.phone = document.getElementById('edit_tm_phone').value.trim();
+
+    saveState();
+    renderView();
+    toast('Data personel berhasil diperbarui!');
+    return true;
+  });
+
+  setTimeout(() => calcEditTeamLive(), 50);
+}
+
+function calcEditTeamLive() {
+  const target = Number(document.getElementById('edit_tm_target')?.value) || 1;
+  const rate = parseNum(document.getElementById('edit_tm_rate')?.value) || 0;
+  const bruto = target * rate;
+  const tax = Math.round(bruto * 0.05);
+  const net = bruto - tax;
+
+  const elB = document.getElementById('lbl_tm_bruto');
+  const elT = document.getElementById('lbl_tm_tax');
+  const elN = document.getElementById('lbl_tm_net');
+  if (elB) elB.textContent = fmtRupiah(bruto);
+  if (elT) elT.textContent = fmtRupiah(tax);
+  if (elN) elN.textContent = fmtRupiah(net);
+}
+
+function deleteTeamMember(id) {
+  if (!confirm('Yakin ingin menghapus personel ini?')) return;
+  S.team = S.team.filter(t => t.id !== id);
+  saveState();
+  closeSheet();
+  renderView();
+  toast('Personel berhasil dihapus');
+}
+
+// Add Individual Honor for specific member
+function openAddHonorForMember(tmId) {
+  openAddHonorModal(tmId);
+}
+
+// Add Individual Honor Modal
+function openAddHonorModal(preSelectedTmId) {
+  const p = curProj();
+  const teamList = S.team.filter(t => t.pid === p.id);
+  
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Pilih Personel Penerima</label>
+        <select id="inp_pay_tm" onchange="onSelectPayrollMember()">
+          ${teamList.map(t => `<option value="${t.id}" ${t.id === preSelectedTmId ? 'selected' : ''}>${t.name} (${t.role})</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Uraian Kegiatan / Penugasan</label>
+        <input id="inp_pay_act" placeholder="misal: Survei Lapangan / Workshop Validitas">
+      </div>
+
+      <div class="grid3">
+        <div class="field">
+          <label>Volume</label>
+          <input id="inp_pay_qty" class="num" type="number" value="1" oninput="calcHonorLive()">
+        </div>
+        <div class="field">
+          <label>Satuan</label>
+          <input id="inp_pay_sat" value="OR">
+        </div>
+        <div class="field">
+          <label>Tarif per Satuan (Rp)</label>
+          <input id="inp_pay_rate" class="num" placeholder="8000" oninput="this.value = fmtNum(parseNum(this.value)); calcHonorLive()">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Tanggal Pelaksanaan</label>
+          <input id="inp_pay_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="field">
+          <label>Status Pembayaran</label>
+          <select id="inp_pay_status">
+            <option value="1">Lunas Ditransfer</option>
+            <option value="0">Draft / Menunggu Pembayaran</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card" style="background:var(--panel2)">
+        <div class="row between">
+          <span>Total Bruto:</span>
+          <b class="num" id="lbl_h_bruto">Rp 0</b>
+        </div>
+        <div class="row between" style="margin-top:4px">
+          <span>PPh 21 (5% Bukan Pegawai):</span>
+          <b class="num" id="lbl_h_tax" style="color:var(--warning)">Rp 0</b>
+        </div>
+        <div class="row between" style="margin-top:6px; border-top:1px solid var(--line); padding-top:6px">
+          <span>Take Home Pay (Netto):</span>
+          <b class="num" id="lbl_h_net" style="color:var(--ok); font-size:16px">Rp 0</b>
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Buat Slip Honorarium', html, 'Simpan & Terbitkan Slip', () => {
+    const tmId = document.getElementById('inp_pay_tm').value;
+    const tm = teamList.find(t => t.id === tmId);
+    if (!tm) return false;
+
+    const act = document.getElementById('inp_pay_act').value.trim() || 'Honorarium Riset';
+    const qty = Number(document.getElementById('inp_pay_qty').value) || 1;
+    const sat = document.getElementById('inp_pay_sat').value.trim() || 'OJ';
+    const rate = parseNum(document.getElementById('inp_pay_rate').value) || 0;
+    const date = document.getElementById('inp_pay_date').value;
+    const isPaid = document.getElementById('inp_pay_status').value === '1';
+
+    const bruto = qty * rate;
+    const tax = Math.round(bruto * 0.05);
+    const net = bruto - tax;
+
+    S.payroll.push({
+      id: 'pay_' + Date.now(),
+      pid: p.id,
+      no: String(S.payroll.length + 1),
+      teamId: tm.id,
+      recipient: tm.name,
+      role: tm.role,
+      nik: tm.nik,
+      npwp: tm.npwp,
+      activity: act,
+      sat,
+      qty,
+      price: rate,
+      bruto,
+      taxRate: 0.05,
+      taxAmount: tax,
+      netto: net,
+      date,
+      isPaid,
+      docs: { kwitansi: true, daftar_hadir: true, npwp: true }
+    });
+    saveState();
+    renderView();
+    toast('Slip honorarium berhasil dibuat!');
+    return true;
+  });
+
+  setTimeout(() => onSelectPayrollMember(), 50);
+}
+
+function onSelectPayrollMember() {
+  const p = curProj();
+  const tmId = document.getElementById('inp_pay_tm')?.value;
+  const tm = S.team.find(t => t.id === tmId);
+  if (!tm) return;
+
+  const satEl = document.getElementById('inp_pay_sat');
+  const rateEl = document.getElementById('inp_pay_rate');
+  const qtyEl = document.getElementById('inp_pay_qty');
+
+  if (satEl && tm.unitDefault) satEl.value = tm.unitDefault;
+  if (rateEl && tm.rateDefault) rateEl.value = fmtNum(tm.rateDefault);
+  if (qtyEl && tm.targetResponden) qtyEl.value = tm.targetResponden;
+
+  calcHonorLive();
+}
+
+function calcHonorLive() {
+  const qty = Number(document.getElementById('inp_pay_qty')?.value) || 1;
+  const rate = parseNum(document.getElementById('inp_pay_rate')?.value) || 0;
+  const bruto = qty * rate;
+  const tax = Math.round(bruto * 0.05);
+  const net = bruto - tax;
+
+  const hBruto = document.getElementById('lbl_h_bruto');
+  const hTax = document.getElementById('lbl_h_tax');
+  const hNet = document.getElementById('lbl_h_net');
+  if (hBruto) hBruto.textContent = fmtRupiah(bruto);
+  if (hTax) hTax.textContent = fmtRupiah(tax);
+  if (hNet) hNet.textContent = fmtRupiah(net);
+}
+
+// Edit Payroll Slip Modal
+function openEditHonorModal(payId) {
+  const h = S.payroll.find(x => x.id === payId);
+  if (!h) return;
+
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Penerima Honor</label>
+        <input id="edit_pay_rec" value="${h.recipient}">
+      </div>
+      <div class="field">
+        <label>Uraian Kegiatan</label>
+        <input id="edit_pay_act" value="${h.activity}">
+      </div>
+      <div class="grid3">
+        <div class="field">
+          <label>Volume</label>
+          <input id="edit_pay_qty" class="num" type="number" value="${h.qty}" oninput="calcEditHonorLive()">
+        </div>
+        <div class="field">
+          <label>Satuan</label>
+          <input id="edit_pay_sat" value="${h.sat}">
+        </div>
+        <div class="field">
+          <label>Tarif Satuan (Rp)</label>
+          <input id="edit_pay_rate" class="num" value="${fmtNum(h.price)}" oninput="this.value = fmtNum(parseNum(this.value)); calcEditHonorLive()">
+        </div>
+      </div>
+      <div class="card" style="background:var(--panel2)">
+        <div class="row between">
+          <span>Bruto:</span>
+          <b class="num" id="lbl_eh_bruto">${fmtRupiah(h.bruto)}</b>
+        </div>
+        <div class="row between" style="margin-top:4px">
+          <span>PPh 21 (5%):</span>
+          <b class="num" id="lbl_eh_tax" style="color:var(--warning)">${fmtRupiah(h.taxAmount)}</b>
+        </div>
+        <div class="row between" style="margin-top:6px; border-top:1px solid var(--line); padding-top:6px">
+          <span>Netto:</span>
+          <b class="num in-c" id="lbl_eh_net">${fmtRupiah(h.netto)}</b>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Tanggal Pembayaran</label>
+          <input id="edit_pay_date" type="date" value="${h.date || ''}">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="edit_pay_status">
+            <option value="1" ${h.isPaid ? 'selected' : ''}>Lunas Ditransfer</option>
+            <option value="0" ${!h.isPaid ? 'selected' : ''}>Draft</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn block bad" onclick="deletePayrollSlip('${h.id}')">Hapus Slip Ini</button>
+    </div>
+  `;
+
+  openSheet('Ubah Slip Honorarium', html, 'Simpan Perubahan', () => {
+    h.recipient = document.getElementById('edit_pay_rec').value.trim() || h.recipient;
+    h.activity = document.getElementById('edit_pay_act').value.trim() || h.activity;
+    h.qty = Number(document.getElementById('edit_pay_qty').value) || 1;
+    h.sat = document.getElementById('edit_pay_sat').value.trim() || h.sat;
+    h.price = parseNum(document.getElementById('edit_pay_rate').value) || 0;
+    h.bruto = h.qty * h.price;
+    h.taxAmount = Math.round(h.bruto * (h.taxRate || 0.05));
+    h.netto = h.bruto - h.taxAmount;
+    h.date = document.getElementById('edit_pay_date').value;
+    h.isPaid = document.getElementById('edit_pay_status').value === '1';
+
+    saveState();
+    renderView();
+    toast('Slip honorarium diperbarui!');
+    return true;
+  });
+}
+
+function calcEditHonorLive() {
+  const qty = Number(document.getElementById('edit_pay_qty')?.value) || 1;
+  const rate = parseNum(document.getElementById('edit_pay_rate')?.value) || 0;
+  const bruto = qty * rate;
+  const tax = Math.round(bruto * 0.05);
+  const net = bruto - tax;
+
+  const hBruto = document.getElementById('lbl_eh_bruto');
+  const hTax = document.getElementById('lbl_eh_tax');
+  const hNet = document.getElementById('lbl_eh_net');
+  if (hBruto) hBruto.textContent = fmtRupiah(bruto);
+  if (hTax) hTax.textContent = fmtRupiah(tax);
+  if (hNet) hNet.textContent = fmtRupiah(net);
+}
+
+function deletePayrollSlip(id) {
+  if (!confirm('Yakin ingin menghapus slip honorarium ini?')) return;
+  S.payroll = S.payroll.filter(h => h.id !== id);
+  saveState();
+  closeSheet();
+  renderView();
+  toast('Slip honorarium dihapus');
+}
+
+// Printable Slip Preview
+function previewSlip(payId) {
+  const h = S.payroll.find(x => x.id === payId);
+  if (!h) return;
+  const p = curProj();
+
+  const slipHtml = `
+    <div class="stack" style="background:#fff; color:#000; padding:18px; border-radius:12px; font-size:13px; font-family:'Plus Jakarta Sans',sans-serif">
+      <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:8px">
+        <h3 style="margin:0; font-size:15px; text-transform:uppercase">TANDA TERIMA HONORARIUM / SURAT PERTANGGUNGJAWABAN</h3>
+        <div style="font-size:12px">${p ? p.institution : 'Lembaga Penelitian'} — TAHUN ANGGARAN ${p ? p.year : '2026'}</div>
+        <div style="font-size:11px; font-weight:600">No. Bukti: ${h.no || 'HR-01'} · Proyek: ${p ? p.name : '-'}</div>
+      </div>
+
+      <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px">
+        <div class="row between"><span>Sudah Terima Dari:</span> <b>Bendahara Pengeluaran Penelitian</b></div>
+        <div class="row between"><span>Nama Penerima:</span> <b>${h.recipient}</b></div>
+        <div class="row between"><span>NIK / NPWP:</span> <span class="num">${h.nik || '-'} / ${h.npwp || '-'}</span></div>
+        <div class="row between"><span>Peran / Jabatan:</span> <span>${h.role}</span></div>
+        <div class="row between"><span>Untuk Pembayaran:</span> <span>${h.activity}</span></div>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-top:12px; font-size:12px" border="1">
+        <tr style="background:#f0f0f0; font-weight:700">
+          <th style="padding:6px">Volume</th>
+          <th style="padding:6px">Satuan</th>
+          <th style="padding:6px">Honor Satuan</th>
+          <th style="padding:6px">Bruto</th>
+          <th style="padding:6px">PPh 21 (5%)</th>
+          <th style="padding:6px">Netto Diterima</th>
+        </tr>
+        <tr style="text-align:center" class="num">
+          <td style="padding:6px">${h.qty}</td>
+          <td style="padding:6px">${h.sat}</td>
+          <td style="padding:6px">${fmtRupiah(h.price)}</td>
+          <td style="padding:6px; font-weight:700">${fmtRupiah(h.bruto)}</td>
+          <td style="padding:6px; color:#d97706">${fmtRupiah(h.taxAmount)}</td>
+          <td style="padding:6px; font-weight:800; color:#059669">${fmtRupiah(h.netto)}</td>
+        </tr>
+      </table>
+
+      <div style="margin-top:10px; font-style:italic; font-size:11px">
+        Terbilang: <i># ${terbilang(h.netto)} Rupiah #</i>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:24px; text-align:center">
+        <div>
+          <div>Setuju Dibayar,</div>
+          <div style="font-size:11px">Ketua Tim Peneliti</div>
+          <div style="margin-top:40px; font-weight:700">${p ? p.leader : 'Ketua Peneliti'}</div>
+        </div>
+        <div>
+          <div>Lunas Dibayar,</div>
+          <div style="font-size:11px">Bendahara Proyek</div>
+          <div style="margin-top:40px; font-weight:700">( ........................................ )</div>
+        </div>
+        <div>
+          <div>${h.date || 'Tanggal Cetak'}</div>
+          <div style="font-size:11px">Penerima Honor</div>
+          <div style="margin-top:40px; font-weight:700">${h.recipient}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  openSheet('Pratinjau Slip Honorarium', slipHtml, 'Cetak / Print', () => {
+    window.print();
+    return true;
+  });
+}
+
+function terbilang(n) {
+  const bilangan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+  n = Math.floor(n);
+  if (n < 12) return bilangan[n];
+  if (n < 20) return terbilang(n - 10) + ' Belas';
+  if (n < 100) return terbilang(Math.floor(n / 10)) + ' Puluh ' + terbilang(n % 10);
+  if (n < 200) return 'Seratus ' + terbilang(n - 100);
+  if (n < 1000) return terbilang(Math.floor(n / 100)) + ' Ratus ' + terbilang(n % 100);
+  if (n < 2000) return 'Seribu ' + terbilang(n - 1000);
+  if (n < 1000000) return terbilang(Math.floor(n / 1000)) + ' Ribu ' + terbilang(n % 1000);
+  if (n < 1000000000) return terbilang(Math.floor(n / 1000000)) + ' Juta ' + terbilang(n % 1000000);
+  return String(n);
+}
+
+// SPJ Checklist Audit Modal for Expense
+function openAuditExpModal(expId) {
+  const e = S.expenses.find(x => x.id === expId);
+  if (!e) return;
+  const d = e.docs || {};
+
+  let checkListFields = [];
+  if (e.cat === 'Konsumsi') {
+    checkListFields = [
+      ['kuitansi', 'Kuitansi Pembayaran / Nota Toko Asli'],
+      ['nik_penjual', 'NIK Penjual / KTP Pemilik Katering / Usaha'],
+      ['daftar_hadir', 'Daftar Hadir Peserta Rapat / FGD Lengkap'],
+      ['notulensi', 'Notulensi & Rundown Pelaksanaan'],
+      ['foto_timestamp', 'Foto Dokumentasi Acara dengan Timestamp Kamera']
+    ];
+  } else if (e.cat === 'Sewa Kendaraan') {
+    checkListFields = [
+      ['kontrak', 'Kontrak Perjanjian Sewa Bermaterai (Rp 10.000)'],
+      ['ktp', 'KTP Pemilik Kendaraan / Penyedia'],
+      ['kuitansi', 'Kwitansi Pembayaran / Bukti Validasi Transfer'],
+      ['stnk', 'STNK Kendaraan yang Masih Aktif'],
+      ['non_pkp', 'Surat Pernyataan Non-PKP Bermaterai'],
+      ['foto_timestamp', 'Foto Kendaraan dengan Timestamp / Plat Nomor Jelas']
+    ];
+  } else if (e.cat === 'Sewa Rumah') {
+    checkListFields = [
+      ['kontrak', 'Kontrak Perjanjian Sewa Rumah Bermaterai'],
+      ['ktp', 'KTP Pemilik Rumah / Posko Lapangan'],
+      ['kuitansi', 'Kuitansi Pembayaran Sewa'],
+      ['foto_timestamp', 'Foto Rumah / Posko dengan Timestamp'],
+      ['bukti_pajak', 'Bukti Potong PPh Final Pasal 4(2) 10%']
+    ];
+  } else {
+    checkListFields = [
+      ['kuitansi', 'Kuitansi Pembayaran Sah'],
+      ['foto_timestamp', 'Foto Dokumentasi Kegiatan Lapangan']
+    ];
+  }
+
+  const html = `
+    <div class="stack">
+      <div style="font-weight:700; font-size:15px">${e.item}</div>
+      <div class="small muted">Kategori: ${e.cat} · Nominal: ${fmtRupiah(e.total)}</div>
+
+      <div class="spj-check-box">
+        <b style="font-size:13px; margin-bottom:4px">Checklist Dokumen Audit SPJ:</b>
+        ${checkListFields.map(([k, label]) => `
+          <label class="check-item">
+            <input type="checkbox" id="chk_doc_${k}" ${d[k] ? 'checked' : ''}>
+            <span>${label}</span>
+          </label>
+        `).join('')}
+      </div>
+
+      <div class="field">
+        <label>Catatan Kelengkapan SPJ</label>
+        <textarea id="inp_doc_notes" rows="2" placeholder="Catatan berkas fisik / link drive">${d.notes || ''}</textarea>
+      </div>
+    </div>
+  `;
+
+  openSheet('Audit Kelengkapan SPJ Belanja', html, 'Simpan Status SPJ', () => {
+    e.docs = e.docs || {};
+    checkListFields.forEach(([k]) => {
+      e.docs[k] = document.getElementById('chk_doc_' + k)?.checked || false;
+    });
+    e.docs.notes = document.getElementById('inp_doc_notes')?.value.trim();
+    saveState();
+    renderView();
+    toast('Status audit SPJ diperbarui!');
+    return true;
+  });
+}
+
+function openAuditPayModal(payId) {
+  const h = S.payroll.find(x => x.id === payId);
+  if (!h) return;
+  const d = h.docs || {};
+
+  const checkListFields = [
+    ['undangan', 'Surat Undangan Resmi Narasumber / Petugas'],
+    ['cv', 'CV / Daftar Riwayat Hidup Narasumber'],
+    ['materi', 'Bahan Paparan / Materi / Output Hasil Kerja'],
+    ['npwp', 'Salinan NPWP / NIK KTP Valid'],
+    ['kwitansi', 'Kwitansi / Tanda Terima Honorarium'],
+    ['kesediaan', 'Surat Kesediaan sebagai Narasumber / Pembantu'],
+    ['daftar_hadir', 'Daftar Hadir Narasumber'],
+    ['rundown', 'Rundown / Agenda Acara'],
+    ['foto', 'Foto Dokumentasi Narasumber dengan Timestamp']
+  ];
+
+  const html = `
+    <div class="stack">
+      <div style="font-weight:700; font-size:15px">${h.recipient}</div>
+      <div class="small muted">${h.activity} · Bruto: ${fmtRupiah(h.bruto)}</div>
+
+      <div class="spj-check-box">
+        <b style="font-size:13px; margin-bottom:4px">Checklist Dokumen SPJ Narasumber:</b>
+        ${checkListFields.map(([k, label]) => `
+          <label class="check-item">
+            <input type="checkbox" id="chk_pay_${k}" ${d[k] ? 'checked' : ''}>
+            <span>${label}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  openSheet('Audit Dokumen SPJ Honorarium', html, 'Simpan Status Dokumen', () => {
+    h.docs = h.docs || {};
+    checkListFields.forEach(([k]) => {
+      h.docs[k] = document.getElementById('chk_pay_' + k)?.checked || false;
+    });
+    saveState();
+    renderView();
+    toast('Dokumen SPJ honorarium diperbarui!');
+    return true;
+  });
+}
+
+// Edit Expense Modal
+function openEditExpenseModal(id) {
+  const e = S.expenses.find(x => x.id === id);
+  if (!e) return;
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Uraian Belanja</label>
+        <input id="edit_exp_item" value="${e.item}">
+      </div>
+      <div class="grid3">
+        <div class="field">
+          <label>Volume</label>
+          <input id="edit_exp_qty" class="num" type="number" value="${e.qty}">
+        </div>
+        <div class="field">
+          <label>Satuan</label>
+          <input id="edit_exp_sat" value="${e.sat}">
+        </div>
+        <div class="field">
+          <label>Harga Satuan</label>
+          <input id="edit_exp_price" class="num" value="${fmtNum(e.price)}" oninput="this.value = fmtNum(parseNum(this.value))">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Penerima / Vendor</label>
+          <input id="edit_exp_rec" value="${e.recipient || ''}">
+        </div>
+        <div class="field">
+          <label>NIK / NPWP Penerima</label>
+          <input id="edit_exp_nik" class="num" value="${e.recipientNik || e.recipientNpwp || ''}">
+        </div>
+      </div>
+      <button class="btn block" onclick="openAuditExpModal('${e.id}')">📋 Periksa Dokumen SPJ</button>
+      <button class="btn block bad" onclick="deleteExpense('${e.id}')">Hapus Transaksi Ini</button>
+    </div>
+  `;
+  openSheet('Ubah Data Belanja', html, 'Simpan Perubahan', () => {
+    e.item = document.getElementById('edit_exp_item').value.trim() || e.item;
+    e.qty = Number(document.getElementById('edit_exp_qty').value) || 1;
+    e.sat = document.getElementById('edit_exp_sat').value.trim() || 'Unit';
+    e.price = parseNum(document.getElementById('edit_exp_price').value) || 0;
+    e.total = e.qty * e.price;
+    e.recipient = document.getElementById('edit_exp_rec').value.trim();
+    e.recipientNik = document.getElementById('edit_exp_nik').value.trim();
+    e.taxAmount = Math.round(e.total * (e.taxRate || 0));
+    e.netAmount = e.total - e.taxAmount;
+    saveState();
+    renderView();
+    toast('Data belanja diperbarui!');
+    return true;
+  });
+}
+
+function deleteExpense(id) {
+  if (!confirm('Yakin ingin menghapus pengeluaran ini?')) return;
+  S.expenses = S.expenses.filter(e => e.id !== id);
+  saveState();
+  closeSheet();
+  renderView();
+  toast('Transaksi berhasil dihapus');
+}
+
+// Edit Inflow Modal
+function openEditInflowModal(id) {
+  const i = S.inflows.find(x => x.id === id);
+  if (!i) return;
+  const html = `
+    <div class="stack">
+      <div class="field">
+        <label>Termin / Keterangan</label>
+        <input id="edit_in_termin" value="${i.termin}">
+      </div>
+      <div class="field">
+        <label>Nominal (Rp)</label>
+        <input id="edit_in_amount" class="num" value="${fmtNum(i.amount)}" oninput="this.value = fmtNum(parseNum(this.value))">
+      </div>
+      <div class="field">
+        <label>Tanggal SP2D</label>
+        <input id="edit_in_date" type="date" value="${i.date}">
+      </div>
+      <button class="btn block bad" onclick="deleteInflow('${i.id}')">Hapus Dana Masuk Ini</button>
+    </div>
+  `;
+  openSheet('Ubah Dana Masuk', html, 'Simpan', () => {
+    i.termin = document.getElementById('edit_in_termin').value.trim() || i.termin;
+    i.amount = parseNum(document.getElementById('edit_in_amount').value) || 0;
+    i.date = document.getElementById('edit_in_date').value;
+    saveState();
+    renderView();
+    toast('Dana masuk diperbarui');
+    return true;
+  });
+}
+
+function deleteInflow(id) {
+  if (!confirm('Hapus catatan dana masuk ini?')) return;
+  S.inflows = S.inflows.filter(i => i.id !== id);
+  saveState();
+  closeSheet();
+  renderView();
+  toast('Dana masuk dihapus');
+}
+
+/* =========================================================================
+   EXPORTERS: SHEETJS (EXCEL) & CORETAX CSV
+   ========================================================================= */
+
+// Export to Coretax CSV
+function exportCoretaxCSV() {
+  const p = curProj();
+  if (!p) return;
+  const pid = p.id;
+  const exps = S.expenses.filter(e => e.pid === pid && (e.taxAmount || 0) > 0);
+  const pays = S.payroll.filter(h => h.pid === pid && (h.taxAmount || 0) > 0);
+
+  let csvContent = 'No,Kode_Objek_Pajak,Nama_Wajib_Pajak,NIK_NPWP_16_Digit,Dasar_Pengenaan_Pajak_DPP,Tarif_Pct,Jumlah_Pajak_Dipotong,Keterangan_Transaksi\n';
+
+  let row = 1;
+  // PPh 21
+  pays.forEach(h => {
+    const nik16 = (h.nik || h.npwp || '').replace(/[^\d]/g, '');
+    csvContent += `"${row++}","21-100-02","${h.recipient}","${nik16}","${h.bruto}","5%","${h.taxAmount}","Honorarium ${h.activity}"\n`;
+  });
+
+  // PPh 23
+  exps.filter(e => e.taxType === 'pph23').forEach(e => {
+    const nik16 = (e.recipientNik || e.recipientNpwp || '').replace(/[^\d]/g, '');
+    csvContent += `"${row++}","24-104-01","${e.recipient}","${nik16}","${e.total}","2%","${e.taxAmount}","${e.item}"\n`;
+  });
+
+  // PPh Final 4(2)
+  exps.filter(e => e.taxType === 'pph4_2').forEach(e => {
+    const nik16 = (e.recipientNik || '').replace(/[^\d]/g, '');
+    csvContent += `"${row++}","28-403-01","${e.recipient}","${nik16}","${e.total}","10%","${e.taxAmount}","${e.item}"\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ZanFin_Coretax_DJP_${p.year}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV Coretax DJP berhasil diunduh!');
+}
+
+// Export to Excel (.xlsx) using SheetJS
+function exportToExcel() {
+  if (typeof XLSX === 'undefined') {
+    toast('Memuat modul SheetJS...');
+    return;
+  }
+  const p = curProj();
+  if (!p) return;
+  const pid = p.id;
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: BKU (Buku Kas Umum)
+  const bkuRows = [
+    ['BUKU KAS UMUM (BKU) PENELITIAN', '', '', '', '', '', ''],
+    ['Judul Riset:', p.name, '', '', '', '', ''],
+    ['Ketua Peneliti:', p.leader, '', '', '', '', ''],
+    ['Institusi:', p.institution, '', 'Tahun Anggaran:', p.year, '', ''],
+    ['', '', '', '', '', '', ''],
+    ['Tanggal', 'Uraian Transaksi', 'Kategori', 'Penerima / Sumber', 'Masuk (Rp)', 'Keluar (Rp)', 'Potongan Pajak (Rp)']
+  ];
+
+  S.inflows.filter(i => i.pid === pid).forEach(i => {
+    bkuRows.push([i.date, i.termin, 'Dana Masuk', i.source, i.amount, 0, 0]);
+  });
+  S.expenses.filter(e => e.pid === pid).forEach(e => {
+    bkuRows.push([e.date, e.item, e.cat, e.recipient, 0, e.total, e.taxAmount || 0]);
+  });
+  S.payroll.filter(h => h.pid === pid).forEach(h => {
+    bkuRows.push([h.date, 'Honor: ' + h.activity, 'Honorarium', h.recipient, 0, h.bruto, h.taxAmount || 0]);
+  });
+
+  const wsBKU = XLSX.utils.aoa_to_sheet(bkuRows);
+  XLSX.utils.book_append_sheet(wb, wsBKU, 'Buku Kas Umum');
+
+  // Sheet 2: Rekapitulasi Pajak Coretax
+  const taxRows = [
+    ['REKAPITULASI PAJAK & CORETAX PENELITIAN', '', '', '', '', ''],
+    ['No', 'Kode Objek Pajak', 'Nama Penerima', 'NIK / NPWP 16 Digit', 'DPP Bruto (Rp)', 'Tarif', 'Potongan Pajak (Rp)']
+  ];
+  let r = 1;
+  S.payroll.filter(h => h.pid === pid && (h.taxAmount || 0) > 0).forEach(h => {
+    taxRows.push([r++, '21-100-02 (PPh 21)', h.recipient, h.nik || h.npwp, h.bruto, '5%', h.taxAmount]);
+  });
+  S.expenses.filter(e => e.pid === pid && (e.taxAmount || 0) > 0).forEach(e => {
+    taxRows.push([r++, e.taxType === 'pph23' ? '24-104-01 (PPh 23)' : '28-403-01 (PPh Final 4(2))', e.recipient, e.recipientNik || e.recipientNpwp, e.total, e.taxRate ? (e.taxRate * 100) + '%' : '0%', e.taxAmount]);
+  });
+
+  const wsTax = XLSX.utils.aoa_to_sheet(taxRows);
+  XLSX.utils.book_append_sheet(wb, wsTax, 'Rekap Pajak Coretax');
+
+  // Sheet 3: Roster Personel & Honor
+  const teamRows = [
+    ['DAFTAR PEMBANTU PENELITIAN & PENERIMA HONOR', '', '', '', '', ''],
+    ['Nama Lengkap', 'Peran', 'NIK KTP (16 Digit)', 'NPWP', 'Bank & No Rekening', 'Total Honor Diterima (Rp)']
+  ];
+  S.team.filter(t => t.pid === pid).forEach(t => {
+    const sum = S.payroll.filter(h => h.teamId === t.id).reduce((s, x) => s + (x.bruto || 0), 0);
+    teamRows.push([t.name, t.role, t.nik || '-', t.npwp || '-', t.bank || '-', sum]);
+  });
+
+  const wsTeam = XLSX.utils.aoa_to_sheet(teamRows);
+  XLSX.utils.book_append_sheet(wb, wsTeam, 'Personel & Honor');
+
+  XLSX.writeFile(wb, `ZanFin_Laporan_Keuangan_Riset_${p.year}.xlsx`);
+  toast('Laporan Excel berhasil diunduh!');
+}
+
+// Service Worker init
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// App Initialization
+window.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  renderHeader();
+  renderNav();
+  renderView();
+});
+</script>
+</body>
+</html>
+'''
+
+with open(r'F:\ZanFin\public\index.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print('Updated public/index.html with full editing controls! Size:', len(html_content))

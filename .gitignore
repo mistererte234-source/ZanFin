@@ -1,0 +1,14 @@
+.env
+.env.*
+node_modules/
+*.log
+.DS_Store
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.zip
+scratch/
+docs/pdf_dump.txt
+~$*

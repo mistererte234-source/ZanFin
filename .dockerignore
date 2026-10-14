@@ -1,0 +1,8 @@
+.git
+.gitignore
+data/
+*.log
+docs/
+scratch/
+build_app.py
+*.zip

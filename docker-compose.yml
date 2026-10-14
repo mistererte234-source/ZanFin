@@ -1,0 +1,12 @@
+services:
+  zanfin:
+    build: .
+    container_name: zanfin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8085"
+    volumes:
+      - zanfin_data:/app/data
+
+volumes:
+  zanfin_data:
