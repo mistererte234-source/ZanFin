@@ -21,19 +21,14 @@ const logoWideSvg = fs.existsSync(path.join(ASSETS_DIR, 'fintax_logo_wide.svg'))
   ? fs.readFileSync(path.join(ASSETS_DIR, 'fintax_logo_wide.svg'), 'utf8')
   : '';
 
-const logoSquareSvg = fs.existsSync(path.join(ASSETS_DIR, 'fintax_logo.svg'))
-  ? fs.readFileSync(path.join(ASSETS_DIR, 'fintax_logo.svg'), 'utf8')
-  : '';
-
 const imgCatatKas = getBase64Asset('screen_catat_kas_keluar.png', 'image/png');
 const imgDashboardKas = getBase64Asset('screen_dashboard_kas.png', 'image/png');
 const imgChecklistSpj = getBase64Asset('screen_checklist_spj.png', 'image/png');
 const imgHonorPajak = getBase64Asset('screen_honor_pajak.png', 'image/png');
-const imgAuditMata = getBase64Asset('screen_audit_matamata.png', 'image/png');
 const imgLoginSwitch = getBase64Asset('screen_login_switch.png', 'image/png');
 const imgKelolaUser = getBase64Asset('screen_kelola_pengguna.png', 'image/png');
 
-console.log('Generating ZanFin Manual Book HTML...');
+console.log('Generating ZanFin Manual Book HTML (Clean Confidential Edition)...');
 
 const htmlContent = `<!DOCTYPE html>
 <html lang="id">
@@ -67,7 +62,6 @@ const htmlContent = `<!DOCTYPE html>
     padding: 0;
   }
 
-  /* Page Break Helpers */
   .page {
     page-break-after: always;
     position: relative;
@@ -81,7 +75,6 @@ const htmlContent = `<!DOCTYPE html>
     page-break-inside: avoid;
   }
 
-  /* Header & Footer on Pages */
   .doc-header {
     display: flex;
     justify-content: space-between;
@@ -120,7 +113,6 @@ const htmlContent = `<!DOCTYPE html>
     font-weight: 600;
   }
 
-  /* Cover Page */
   .cover {
     display: flex;
     flex-direction: column;
@@ -202,13 +194,11 @@ const htmlContent = `<!DOCTYPE html>
     color: #f1f5f9;
   }
 
-  /* Typography */
   h1 { font-size: 18pt; font-weight: 800; color: #0f172a; margin: 0 0 12px; letter-spacing: -0.3px; }
   h2 { font-size: 14pt; font-weight: 700; color: #1e293b; margin: 18px 0 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
   h3 { font-size: 11.5pt; font-weight: 700; color: #334155; margin: 14px 0 6px; }
   p { margin: 0 0 10px; color: #334155; font-size: 10pt; text-align: justify; }
 
-  /* Cards & Callouts */
   .card {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -231,18 +221,12 @@ const htmlContent = `<!DOCTYPE html>
     border: 1px solid #fde68a;
     border-left: 5px solid #d97706;
   }
-  .card-danger {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-left: 5px solid #dc2626;
-  }
   .card-success {
     background: #f0fdf4;
     border: 1px solid #bbf7d0;
     border-left: 5px solid #16a34a;
   }
 
-  /* Badges & Pills */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -256,9 +240,7 @@ const htmlContent = `<!DOCTYPE html>
   .badge-green { background: #dcfce7; color: #15803d; }
   .badge-purple { background: #f3e8ff; color: #7e22ce; }
   .badge-amber { background: #fef3c7; color: #b45309; }
-  .badge-red { background: #fee2e2; color: #b91c1c; }
 
-  /* Tables */
   table.data-table {
     width: 100%;
     border-collapse: collapse;
@@ -285,7 +267,6 @@ const htmlContent = `<!DOCTYPE html>
     background: #f8fafc;
   }
 
-  /* Screenshot Mockup Container */
   .mockup-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -315,7 +296,6 @@ const htmlContent = `<!DOCTYPE html>
     font-weight: 600;
   }
 
-  /* Step by Step list */
   .step-box {
     display: flex;
     gap: 12px;
@@ -351,7 +331,6 @@ const htmlContent = `<!DOCTYPE html>
     color: #475569;
   }
 
-  /* Monospace snippet */
   .mono {
     font-family: 'JetBrains Mono', monospace;
     background: #1e293b;
@@ -361,12 +340,11 @@ const htmlContent = `<!DOCTYPE html>
     font-size: 8.5pt;
   }
 
-  /* Table of Contents */
   .toc-item {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 6px 0;
+    padding: 7px 0;
     border-bottom: 1px dotted #cbd5e1;
     font-size: 9.5pt;
     color: #1e293b;
@@ -396,7 +374,7 @@ const htmlContent = `<!DOCTYPE html>
         </div>
       </div>
 
-      <div style="margin-top: 45px;">
+      <div style="margin-top: 50px;">
         <div style="color: #38bdf8; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
           BUKU PANDUAN PENGGUNA TERPADU (USER MANUAL GUIDE)
         </div>
@@ -404,7 +382,7 @@ const htmlContent = `<!DOCTYPE html>
           Pedoman Operasional ZanFin FinTax
         </h1>
         <div class="cover-subtitle">
-          Panduan Praktis, Prosedur Input Transaksi, Bukti Fisik Nota, Penggajian &amp; e-Bupot 21 Coretax DJP, Approval Belanja, serta Pengawasan Serapan Anggaran Khusus bagi <b>Admin Operasional, Ketua Peneliti, &amp; Bendahara Proyek</b>.
+          Panduan Praktis, Prosedur Input Transaksi Belanja, Bukti Fisik Nota, Penggajian &amp; e-Bupot 21 Coretax DJP, Approval Belanja, serta Pengawasan Serapan Anggaran Khusus bagi <b>Admin Operasional, Ketua Peneliti, &amp; Bendahara Proyek</b>.
         </div>
       </div>
 
@@ -412,7 +390,7 @@ const htmlContent = `<!DOCTYPE html>
         <div class="role-chip"><span style="color:#38bdf8">🛡️</span> Admin Operasional</div>
         <div class="role-chip"><span style="color:#818cf8">🎓</span> Ketua Peneliti</div>
         <div class="role-chip"><span style="color:#34d399">💼</span> Bendahara Proyek</div>
-        <div class="role-chip"><span style="color:#f472b6">👑</span> Super Admin (Master)</div>
+        <div class="role-chip"><span style="color:#fbbf24">🔬</span> Anggota Peneliti</div>
       </div>
     </div>
 
@@ -420,7 +398,7 @@ const htmlContent = `<!DOCTYPE html>
       <div class="cover-meta-grid">
         <div class="cover-meta-item">
           <h5>Edisi &amp; Versi Sistem</h5>
-          <p>Versi 2.9.0 (Rilis 2026)</p>
+          <p>Versi 2.9.1 (Rilis 2026)</p>
         </div>
         <div class="cover-meta-item">
           <h5>Kepatuhan Regulasi</h5>
@@ -438,30 +416,30 @@ const htmlContent = `<!DOCTYPE html>
 <!-- ==================== HALAMAN 2: DAFTAR ISI & RINGKASAN ==================== -->
 <div class="page">
   <div class="doc-header">
-    <div class="logo-mini"><span>📊</span> ZanFin FinTax v2.9.0</div>
+    <div class="logo-mini"><span>📊</span> ZanFin FinTax v2.9.1</div>
     <div>Daftar Isi &amp; Ringkasan Eksekutif</div>
   </div>
 
   <h1>Daftar Isi &amp; Ringkasan Eksekutif</h1>
   <p>
-    <b>ZanFin FinTax</b> adalah sistem intelijen manajemen keuangan dan perpajakan riset yang dikembangkan khusus untuk mempermudah pencatatan kas masuk-keluar, digitalisasi bukti nota belanja, kalkulasi otomatis PPh Pasal 21 skema Tarif Efektif Rata-Rata (TER) Coretax DJP, serta penyusunan Buku Kas Umum (BKU) dan Surat Pertanggungjawaban (SPJ) LPJ secara transparan dan akuntabel.
+    <b>ZanFin FinTax</b> adalah sistem intelijen manajemen keuangan dan perpajakan riset yang dikembangkan khusus untuk mempermudah pencatatan kas masuk-keluar, digitalisasi bukti nota belanja fisik, kalkulasi otomatis PPh Pasal 21 skema Tarif Efektif Rata-Rata (TER) Coretax DJP, serta penyusunan Buku Kas Umum (BKU) dan Surat Pertanggungjawaban (SPJ) LPJ secara transparan dan akuntabel.
   </p>
 
   <div class="card card-highlight">
     <h3 style="margin:0 0 6px;color:#0369a1">🎯 Tujuan Utama Buku Panduan Ini</h3>
     <p style="margin:0;font-size:9pt;color:#075985">
-      Memberikan panduan komprehensif langkah-demi-langkah bagi <b>Admin</b> dalam menginput transaksi dan melampirkan nota; bagi <b>Bendahara</b> dalam mengelola honorarium, pajak e-Bupot, dan BKU; serta bagi <b>Ketua</b> dalam mengawasi serapan dana dan mengesahkan kuitansi belanja riset.
+      Memberikan panduan operasional langkah-demi-langkah bagi <b>Admin Operasional</b> dalam menginput belanja harian dan melampirkan nota; bagi <b>Bendahara Proyek</b> dalam mengelola honorarium, pajak e-Bupot, dan BKU; serta bagi <b>Ketua Peneliti</b> dalam mengawasi serapan dana dan mengesahkan kuitansi belanja riset.
     </p>
   </div>
 
   <h2>Daftar Isi Manual Book</h2>
   <div style="margin-top: 10px;">
     <div class="toc-item">
-      <div><strong>Bab 1.</strong> Matriks Peran &amp; Hak Akses Pengguna</div>
+      <div><strong>Bab 1.</strong> Matriks Peran &amp; Hak Akses Pengguna Tim Riset</div>
       <span class="page-num">Hal. 3</span>
     </div>
     <div class="toc-item">
-      <div><strong>Bab 2.</strong> Akun Default &amp; Prosedur Masuk Sistem (Login)</div>
+      <div><strong>Bab 2.</strong> Akun Pengguna &amp; Prosedur Masuk Sistem (Login)</div>
       <span class="page-num">Hal. 4</span>
     </div>
     <div class="toc-item">
@@ -477,11 +455,11 @@ const htmlContent = `<!DOCTYPE html>
       <span class="page-num">Hal. 9</span>
     </div>
     <div class="toc-item">
-      <div><strong>Bab 6.</strong> Panduan Super Admin: Catatan Mata-Mata &amp; Backup Otomatis</div>
+      <div><strong>Bab 6.</strong> Standard Operating Procedure (SOP) Siklus Keuangan Riset</div>
       <span class="page-num">Hal. 10</span>
     </div>
     <div class="toc-item">
-      <div><strong>Bab 7.</strong> Standard Operating Procedure (SOP) Siklus Keuangan Riset</div>
+      <div><strong>Bab 7.</strong> Keamanan Data, Auto-Backup &amp; Integritas Sistem</div>
       <span class="page-num">Hal. 11</span>
     </div>
     <div class="toc-item">
@@ -492,7 +470,7 @@ const htmlContent = `<!DOCTYPE html>
 
   <h2>Arsitektur Keamanan &amp; PWA Offline-First</h2>
   <p>
-    ZanFin dirancang dengan teknologi <i>Progressive Web Application (PWA)</i>. Data tersimpan secara aman di database SQLite lokal server dengan enkripsi session, mendukung pencatatan offline di lapangan saat tidak ada sinyal internet, dan otomatis melakukan sinkronisasi ketika perangkat kembali online.
+    ZanFin dirancang dengan teknologi <i>Progressive Web Application (PWA)</i>. Data tersimpan secara aman di database SQLite server dengan enkripsi session, mendukung pencatatan offline di lapangan saat tidak ada sinyal internet, dan otomatis melakukan sinkronisasi ketika perangkat kembali online.
   </p>
 
   <div class="doc-footer">
@@ -504,59 +482,48 @@ const htmlContent = `<!DOCTYPE html>
 <!-- ==================== HALAMAN 3: MATRIKS PERAN ==================== -->
 <div class="page">
   <div class="doc-header">
-    <div class="logo-mini"><span>👥</span> Bab 1: Matriks Hak Akses &amp; Wewenang</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div class="logo-mini"><span>👥</span> Bab 1: Matriks Hak Akses Tim Riset</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h1>Bab 1. Matriks Hak Akses &amp; Wewenang</h1>
   <p>
-    Untuk menjaga <i>segregation of duties</i> (pemisahan fungsi) dan integritas tata kelola keuangan, ZanFin membagi wewenang ke dalam 5 tingkatan peran hierarkis:
+    Untuk menjaga <i>segregation of duties</i> (pemisahan fungsi) dan integritas tata kelola keuangan, ZanFin membagi wewenang ke dalam 4 tingkatan peran operasional:
   </p>
 
   <table class="data-table">
     <thead>
       <tr>
-        <th style="width: 20%;">Peran (Role)</th>
-        <th style="width: 15%;">Tag / Ikon</th>
-        <th style="width: 45%;">Tugas Pokok &amp; Kewenangan</th>
-        <th style="width: 20%;">Akses Mata-Mata</th>
+        <th style="width: 22%;">Peran (Role)</th>
+        <th style="width: 18%;">Tag / Ikon</th>
+        <th style="width: 60%;">Tugas Pokok &amp; Kewenangan</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><b>Super Admin</b></td>
-        <td><span class="badge badge-purple">👑 Master</span></td>
-        <td>Kontrol penuh sistem, manajemen akun seluruh level, restore database, dan memantau log aktivitas mata-mata (IP/GPS/Device).</td>
-        <td><span class="badge badge-green">Penuh (Tanpa Batas)</span></td>
-      </tr>
-      <tr>
         <td><b>Admin Operasional</b></td>
         <td><span class="badge badge-blue">🛡️ Admin</span></td>
-        <td>Mencatat kas masuk &amp; belanja keluar harian, mengunggah foto nota fisik, mengelola profil anggota tim, dan menghapus data dummy.</td>
-        <td><span class="badge badge-red">Dibatasi (Tertutup)</span></td>
+        <td>Mencatat kas masuk &amp; belanja keluar harian, mengunggah foto nota fisik, mengelola profil anggota tim riset, dan merapikan data transaksi.</td>
       </tr>
       <tr>
         <td><b>Ketua Peneliti</b></td>
         <td><span class="badge badge-purple">🎓 Ketua</span></td>
-        <td>Monitoring pagu vs realisasi, verifikasi fisik keabsahan belanja, memberikan persetujuan (approval) kas keluar, dan pengesahan LPJ.</td>
-        <td><span class="badge badge-red">Dibatasi</span></td>
+        <td>Monitoring pagu vs realisasi anggaran, verifikasi keabsahan fisik belanja, memberikan persetujuan (approval) kas keluar, dan pengesahan kuitansi LPJ.</td>
       </tr>
       <tr>
         <td><b>Bendahara Proyek</b></td>
         <td><span class="badge badge-green">💼 Bendahara</span></td>
-        <td>Input kas, kalkulasi honorarium, pemotongan PPh 21 Coretax DJP, upload bukti transfer, unduh slip resmi, dan ekspor BKU / SPJ.</td>
-        <td><span class="badge badge-red">Dibatasi</span></td>
+        <td>Input kas, kalkulasi honorarium, pemotongan PPh 21 Coretax DJP, upload bukti transfer bank, unduh slip resmi e-Bupot, dan ekspor BKU / SPJ.</td>
       </tr>
       <tr>
         <td><b>Anggota Peneliti</b></td>
         <td><span class="badge badge-amber">🔬 Peneliti</span></td>
         <td>Hanya memiliki wewenang membaca (read-only) untuk memantau progres pelaksanaan riset dan serapan anggaran kegiatan.</td>
-        <td><span class="badge badge-red">Dibatasi</span></td>
       </tr>
     </tbody>
   </table>
 
-  <h2>Tabel Matriks Fitur per Peran</h2>
+  <h2>Tabel Matriks Fitur Operasional</h2>
   <table class="data-table">
     <thead>
       <tr>
@@ -564,7 +531,7 @@ const htmlContent = `<!DOCTYPE html>
         <th style="text-align:center">Admin</th>
         <th style="text-align:center">Bendahara</th>
         <th style="text-align:center">Ketua</th>
-        <th style="text-align:center">Superadmin</th>
+        <th style="text-align:center">Peneliti</th>
       </tr>
     </thead>
     <tbody>
@@ -573,49 +540,42 @@ const htmlContent = `<!DOCTYPE html>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅</td>
-        <td style="text-align:center">✅</td>
+        <td style="text-align:center">👁️</td>
       </tr>
       <tr>
         <td>Catat Kas Keluar &amp; Upload Foto Nota</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">❌ (Review)</td>
-        <td style="text-align:center">✅</td>
+        <td style="text-align:center">❌</td>
       </tr>
       <tr>
         <td>Hitung Honor &amp; Potong PPh 21 Coretax</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅ (Utama)</td>
         <td style="text-align:center">👁️ (Lihat)</td>
-        <td style="text-align:center">✅</td>
+        <td style="text-align:center">❌</td>
       </tr>
       <tr>
         <td>Approval Transaksi Belanja Riset</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">❌</td>
         <td style="text-align:center">✅ (Wajib)</td>
-        <td style="text-align:center">✅</td>
+        <td style="text-align:center">❌</td>
       </tr>
       <tr>
         <td>Ekspor Buku Kas Umum (Excel) &amp; CSV Coretax</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">✅</td>
-        <td style="text-align:center">✅</td>
+        <td style="text-align:center">👁️</td>
       </tr>
       <tr>
-        <td>Kelola Akun Pengguna &amp; Hapus Data Dummy</td>
+        <td>Kelola Akun Anggota Tim Peneliti</td>
         <td style="text-align:center">✅</td>
         <td style="text-align:center">❌</td>
         <td style="text-align:center">❌</td>
-        <td style="text-align:center">✅</td>
-      </tr>
-      <tr>
-        <td>Catatan Mata-Mata (Audit Log IP/GPS) &amp; Restore VPS</td>
         <td style="text-align:center">❌</td>
-        <td style="text-align:center">❌</td>
-        <td style="text-align:center">❌</td>
-        <td style="text-align:center">✅ (Eksklusif)</td>
       </tr>
     </tbody>
   </table>
@@ -623,7 +583,7 @@ const htmlContent = `<!DOCTYPE html>
   <div class="card card-tax">
     <h3 style="margin:0 0 4px;color:#7e22ce">🏛️ Catatan Kepatuhan Coretax DJP &amp; Standar Audit</h3>
     <p style="margin:0;font-size:9pt;color:#581c87">
-      Pemisahan peran ini memastikan bahwa bendahara yang menginput belanja tidak dapat meng-approve dirinya sendiri tanpa pengawasan dari Ketua Peneliti. Seluruh berkas nota yang diunggah oleh Admin maupun Bendahara akan dienkripsi dan dicatat secara terpusat.
+      Pemisahan peran ini memastikan bahwa bendahara yang menginput belanja tidak dapat meng-approve pengeluaran sendiri tanpa pengesahan dari Ketua Peneliti. Seluruh berkas nota yang diunggah akan dienkripsi dan diarsipkan terpusat untuk keperluan pemeriksaan LPJ.
     </p>
   </div>
 
@@ -637,12 +597,12 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>🔐</span> Bab 2: Prosedur Masuk Sistem (Login)</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
-  <h1>Bab 2. Akun Default &amp; Prosedur Masuk (Login)</h1>
+  <h1>Bab 2. Akun Pengguna &amp; Prosedur Masuk (Login)</h1>
   <p>
-    Setiap pejabat dan anggota tim riset memiliki akun personal dengan kata sandi bawaan yang dapat langsung digunakan saat instalasi awal pada peramban web (Chrome, Edge, Safari di HP maupun Laptop):
+    Setiap pejabat dan anggota tim riset memiliki akun personal dengan kata sandi bawaan yang dapat langsung digunakan pada peramban web (Chrome, Edge, Safari di HP maupun Laptop):
   </p>
 
   <table class="data-table">
@@ -655,12 +615,6 @@ const htmlContent = `<!DOCTYPE html>
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td><b>Zandev Superadmin (Master)</b></td>
-        <td><span class="badge badge-purple">Super Admin</span></td>
-        <td><span class="mono">superadmin</span></td>
-        <td><span class="mono">superadmin123</span></td>
-      </tr>
       <tr>
         <td><b>Administrator Operasional</b></td>
         <td><span class="badge badge-blue">Admin Operasional</span></td>
@@ -704,14 +658,14 @@ const htmlContent = `<!DOCTYPE html>
     <div class="step-num">1</div>
     <div class="step-content">
       <h4>Buka Menu Akun / Profil</h4>
-      <p>Klik ikon profil Anda di pojok kanan atas aplikasi atau pilih menu <b>"Kelola Pengguna &amp; Peran"</b> di tab Pengaturan.</p>
+      <p>Klik ikon profil Anda di pojok kanan atas aplikasi atau pilih menu <b>"Profil Saya &amp; Keamanan"</b> di tab Menu Lainnya.</p>
     </div>
   </div>
   <div class="step-box">
     <div class="step-num">2</div>
     <div class="step-content">
       <h4>Upload Foto Profil Pribadi</h4>
-      <p>Pilih foto formal/avatar dari galeri perangkat Anda. Sistem otomatis memotong foto menjadi rasio lingkaran premium.</p>
+      <p>Pilih foto formal dari galeri perangkat Anda. Sistem otomatis memotong foto menjadi rasio lingkaran premium.</p>
     </div>
   </div>
   <div class="step-box">
@@ -732,17 +686,17 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>🛡️</span> Bab 3: Panduan Admin Operasional</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h1>Bab 3. Panduan Khusus: Admin Operasional</h1>
   <p>
-    <b>Admin Operasional</b> bertugas menjalankan administrasi harian sistem: mencatat transaksi kas keluar, mengunggah foto fisik nota atau kuitansi, mengelola tim peneliti, serta membersihkan data dummy.
+    <b>Admin Operasional</b> bertugas menjalankan administrasi harian sistem: mencatat transaksi kas keluar, mengunggah foto fisik nota atau kuitansi, mengelola data tim riset, serta merapikan data pembukuan.
   </p>
 
   <h2>3.1 Mencatat Kas Keluar &amp; Upload Bukti Nota Fisik</h2>
   <p>
-    Setiap pembelanjaan barang habis pakai, konsumsi rapat, sewa laboratorium, atau transport lapangan wajib dicatat dengan bukti nota:
+    Setiap pembelanjaan bahan habis pakai, konsumsi rapat, sewa lab, atau transport lapangan wajib dicatat dengan bukti nota:
   </p>
 
   <div class="step-box">
@@ -763,7 +717,7 @@ const htmlContent = `<!DOCTYPE html>
     <div class="step-num">3</div>
     <div class="step-content">
       <h4>Lampirkan Bukti Fisik (Kamera / File)</h4>
-      <p>Sentuh area <b>"Unggah Foto Nota / Kuitansi / PDF"</b>. Anda bisa langsung memotret struk via kamera smartphone atau memilih file dari galeri/penyimpanan.</p>
+      <p>Sentuh area <b>"Unggah Foto Nota / Kuitansi / PDF"</b>. Anda bisa langsung memotret struk via kamera smartphone atau memilih file dari penyimpanan.</p>
     </div>
   </div>
 
@@ -795,7 +749,7 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>🛡️</span> Bab 3: Panduan Admin Operasional (Lanjutan)</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h2>3.2 Memeriksa &amp; Melengkapi Bukti Nota yang Terlewat</h2>
@@ -830,7 +784,7 @@ const htmlContent = `<!DOCTYPE html>
     Admin memiliki kewenangan menambahkan akun baru bagi asisten peneliti, enumerator, atau staf administrasi:
   </p>
   <ul>
-    <li>Buka menu <b>Pengaturan › Kelola Pengguna &amp; Peran</b>.</li>
+    <li>Buka menu <b>Menu Lainnya › Kelola Pengguna &amp; Akun</b>.</li>
     <li>Klik tombol <b>"+ Tambah Pengguna Baru"</b>.</li>
     <li>Isi nama lengkap, username unik, peran (misal: <i>Asisten Peneliti</i>), dan password awal.</li>
     <li>Akun yang bersangkutan dapat langsung digunakan untuk login di perangkat masing-masing.</li>
@@ -844,7 +798,7 @@ const htmlContent = `<!DOCTYPE html>
   <div class="card card-warning">
     <h3 style="margin:0 0 4px;color:#b45309">⚠️ Perhatian Pengosongan Data Dummy</h3>
     <p style="margin:0;font-size:8.8pt;color:#92400e">
-      Akses tombol <b>"Hapus Data Dummy"</b> di tab Pengaturan. Fitur ini akan menghapus seluruh catatan transaksi simulasi sekaligus menjaga akun tim dan struktur anggaran tetap utuh. Pastikan Anda telah mengunduh backup sebelum melakukan reset ini.
+      Akses tombol <b>"Kelola &amp; Reset Data Dummy / Excel"</b> di Menu Lainnya. Fitur ini akan menghapus seluruh catatan transaksi simulasi sekaligus menjaga akun tim dan struktur anggaran tetap utuh dan siap pakai.
     </p>
   </div>
 
@@ -858,7 +812,7 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>💼</span> Bab 4: Panduan Bendahara Proyek</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h1>Bab 4. Panduan Khusus: Bendahara Proyek</h1>
@@ -924,7 +878,7 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>💼</span> Bab 4: Bendahara (e-Bupot &amp; Ekspor BKU)</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h2>4.3 Unggah Bukti Transfer &amp; Unduh Slip Resmi e-Bupot DJP</h2>
@@ -980,7 +934,7 @@ const htmlContent = `<!DOCTYPE html>
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>🎓</span> Bab 5: Panduan Ketua Peneliti</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h1>Bab 5. Panduan Khusus: Ketua Peneliti</h1>
@@ -1037,92 +991,14 @@ const htmlContent = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ==================== HALAMAN 10: SUPER ADMIN ==================== -->
+<!-- ==================== HALAMAN 10: SOP WORKFLOW ==================== -->
 <div class="page">
   <div class="doc-header">
-    <div class="logo-mini"><span>👑</span> Bab 6: Panduan Super Admin &amp; IT</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div class="logo-mini"><span>🔄</span> Bab 6: SOP Siklus Keuangan Riset</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
-  <h1>Bab 6. Panduan Super Admin: Catatan Mata-Mata &amp; Backup</h1>
-  <p>
-    <b>Super Admin</b> adalah penguasa tertinggi sistem. Dilengkapi dengan perangkat pengawasan intelijen dan sistem pencadangan mandiri untuk melindungi data dari insiden kegagalan server VPS.
-  </p>
-
-  <h2>6.1 Catatan Mata-Mata (Audit Log Eksekutif Intelijen)</h2>
-  <p>
-    Setiap aktivitas login, perubahan transaksi, penggajian, dan pengunduhan dokumen dicatat otomatis secara rahasia:
-  </p>
-
-  <div class="mockup-card" style="margin-bottom: 14px;">
-    <img src="${imgAuditMata}" alt="Catatan Mata-Mata Audit Log" style="max-height: 200px;">
-    <div class="mockup-caption">Gambar 6.1: Catatan Mata-Mata Superadmin (IP, Perangkat, GPS, Jam)</div>
-  </div>
-
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Elemen Data</th>
-        <th>Informasi yang Direkam</th>
-        <th>Tujuan Pengawasan</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><b>Identitas &amp; Waktu</b></td>
-        <td>Username, Nama Akun, Peran, dan Timestamp detik</td>
-        <td>Mengetahui aktor penginput atau pengubah data.</td>
-      </tr>
-      <tr>
-        <td><b>IP Address &amp; Perangkat</b></td>
-        <td>Alamat IP jaringan, browser, dan tipe smartphone/PC</td>
-        <td>Mendeteksi akses ilegal dari luar lokasi kerja resmi.</td>
-      </tr>
-      <tr>
-        <td><b>Koordinat GPS</b></td>
-        <td>Garis Lintang (Latitude), Bujur (Longitude), &amp; Akurasi</td>
-        <td>Melacak lokasi geografis fisik pengguna saat melakukan transaksi.</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h2>6.2 Prosedur Auto-Backup Mingguan &amp; Restore Database VPS</h2>
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-content">
-      <h4>Notifikasi &amp; Auto-Backup Mingguan</h4>
-      <p>Sistem secara otomatis mendeteksi jika data belum dicadangkan lebih dari 7 hari dan mengingatkan Superadmin untuk mengunduh arsip cadangan (JSON).</p>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-content">
-      <h4>Download Cadangan Kapan Saja</h4>
-      <p>Klik tombol <b>"Unduh Cadangan Database (.json)"</b> di menu Pengaturan Superadmin. Seluruh transaksi, user, dan berkas tersimpan aman di komputer lokal Anda.</p>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-content">
-      <h4>Pemulihan Cepat (Restore Database)</h4>
-      <p>Jika server VPS mengalami error/reinstalasi, cukup pilih file JSON backup terakhir melalui form <b>"Pulihkan Database"</b>. Dalam hitungan detik, seluruh sistem kembali seperti semula!</p>
-    </div>
-  </div>
-
-  <div class="doc-footer">
-    <div>ZanFin FinTax User Manual Guide · Hak Cipta &copy; 2026</div>
-    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
-  </div>
-</div>
-
-<!-- ==================== HALAMAN 11: SOP WORKFLOW ==================== -->
-<div class="page">
-  <div class="doc-header">
-    <div class="logo-mini"><span>🔄</span> Bab 7: SOP Siklus Keuangan Riset</div>
-    <div>ZanFin FinTax v2.9.0</div>
-  </div>
-
-  <h1>Bab 7. Standard Operating Procedure (SOP)</h1>
+  <h1>Bab 6. Standard Operating Procedure (SOP)</h1>
   <p>
     Alur kerja standar tata kelola keuangan dan perpajakan pada ekosistem riset ZanFin dirancang mengikuti siklus tertutup 5 langkah:
   </p>
@@ -1192,11 +1068,49 @@ const htmlContent = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- ==================== HALAMAN 11: KEAMANAN & BACKUP ==================== -->
+<div class="page">
+  <div class="doc-header">
+    <div class="logo-mini"><span>🛡️</span> Bab 7: Keamanan Data &amp; Cadangan Sistem</div>
+    <div>ZanFin FinTax v2.9.1</div>
+  </div>
+
+  <h1>Bab 7. Keamanan Data, Auto-Backup &amp; Integritas</h1>
+  <p>
+    ZanFin FinTax menerapkan standar perlindungan data riset tingkat enterprise untuk menjamin bahwa seluruh berkas keuangan, dokumen nota, dan perhitungan pajak terlindungi dari kegagalan teknis perangkat.
+  </p>
+
+  <h2>7.1 Cadangan Otomatis Terjadwal (Scheduled Auto-Backup)</h2>
+  <p>
+    Sistem dilengkapi mekanisme <i>background cron snapshot</i> yang secara rutin membuat arsip cadangan data pembukuan. Apabila terjadi kendala pada peramban atau perangkat keras pengguna, basis data transaksi dapat dipulihkan dengan cepat ke titik pemulihan stabil terakhir.
+  </p>
+
+  <h2>7.2 Enkripsi Sesi &amp; Kepatuhan Privasi Akun</h2>
+  <p>
+    Setiap interaksi pengguna dilindungi token sesi berkala dengan validasi hak akses berjenjang. Pengguna disarankan untuk:
+  </p>
+  <ul>
+    <li>Mengganti kata sandi bawaan pada saat login pertama kali.</li>
+    <li>Tidak membagikan username atau password kepada pihak luar di luar tim peneliti resmi.</li>
+    <li>Melakukan <i>Logout</i> apabila menggunakan perangkat komputer bersama di perpustakaan atau lab umum.</li>
+  </ul>
+
+  <h2>7.3 Pemeliharaan Berkas Digital Nota &amp; Slip</h2>
+  <p>
+    Seluruh berkas bukti fisik (struk, kuitansi, faktur belanja, dan bukti mutasi bank) dikonversi menjadi data terenkripsi dan disimpan permanen bersama data transaksi. Hal ini memastikan integritas rekam jejak keuangan tetap utuh dan siap sewaktu-waktu dilakukan uji petik oleh auditor independen, BPK, atau Inspektorat Jenderal.
+  </p>
+
+  <div class="doc-footer">
+    <div>ZanFin FinTax User Manual Guide · Hak Cipta &copy; 2026</div>
+    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+  </div>
+</div>
+
 <!-- ==================== HALAMAN 12: FAQ & PENUTUP ==================== -->
 <div class="page">
   <div class="doc-header">
     <div class="logo-mini"><span>❓</span> Bab 8: Tanya Jawab &amp; Bantuan Teknis</div>
-    <div>ZanFin FinTax v2.9.0</div>
+    <div>ZanFin FinTax v2.9.1</div>
   </div>
 
   <h1>Bab 8. Tanya Jawab (FAQ) &amp; Bantuan Teknis</h1>
@@ -1225,7 +1139,7 @@ const htmlContent = `<!DOCTYPE html>
   <div class="card">
     <h3 style="margin:0 0 4px;color:#0f172a">Q4: Siapa yang harus dihubungi jika terjadi kendala teknis atau lupa sandi?</h3>
     <p style="margin:0;font-size:8.8pt">
-      Hubungi <b>Super Admin</b> tim Anda untuk melakukan reset kata sandi atau laporkan kendala sistem kepada tim rekayasa perangkat lunak <b>Zandev Lab</b>.
+      Hubungi administrator tim Anda untuk melakukan reset kata sandi atau laporkan kendala sistem kepada tim rekayasa perangkat lunak <b>Zandev Lab</b>.
     </p>
   </div>
 

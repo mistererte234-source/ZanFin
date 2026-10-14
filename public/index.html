@@ -3620,35 +3620,8 @@ function vLainnya() {
         '</div>' +
         '<div class="r">›</div>' +
       '</button>' +
-      '<button class="it" onclick="shareToWhatsApp()">' +
-        '<div class="avatar" style="color:#25D366;background:rgba(37,211,102,0.12);font-size:18px">💬</div>' +
-        '<div class="t">' +
-          '<b>Bagikan ke WhatsApp Tim</b>' +
-          '<span>Kirim tautan resmi dengan preview banner &amp; info sistem</span>' +
-        '</div>' +
-        '<div class="r">›</div>' +
-      '</button>' +
     '</div>' +
   '</div>';
-}
-
-function shareToWhatsApp() {
-  const shareText =
-    "🏛️ *ZanFin — Sistem Kontrol Keuangan & Pajak Riset*\n" +
-    "Aplikasi pencatatan kas hibah termin riset, honorarium tim, checklist berkas SPJ/LPJ & integrasi e-Bupot Coretax DJP.\n\n" +
-    "🔗 Akses Sistem: https://fintax.zandev.id\n" +
-    "✨ Build n Code by zandev.id";
-
-  if (navigator.share) {
-    navigator.share({
-      title: 'ZanFin — Kontrol Keuangan & Pajak Riset',
-      text: shareText,
-      url: 'https://fintax.zandev.id'
-    }).catch(() => {});
-  } else {
-    const waUrl = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(shareText);
-    window.open(waUrl, '_blank');
-  }
 }
 
 /* ==========================================================================
