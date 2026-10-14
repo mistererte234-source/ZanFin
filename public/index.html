@@ -2275,6 +2275,310 @@ function feedHTML(pid) {
 }
 
 /* ==========================================================================
+   DOCUMENT & RECEIPT ATTACHMENT SYSTEM (Nota, Kuitansi, Slip Gaji e-Bupot)
+   ========================================================================== */
+let currentProof = null;
+
+function resetCurrentProof() {
+  currentProof = null;
+}
+
+function handleProofFileSelect(event, previewContainerId) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isImg = file.type.startsWith('image/');
+
+  if (!isPdf && !isImg) {
+    alert('Format file tidak didukung. Harap pilih foto nota (JPG, PNG, WebP) atau berkas dokumen PDF.');
+    return;
+  }
+
+  if (isPdf) {
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran berkas PDF maksimal 5 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      currentProof = {
+        dataUrl: e.target.result,
+        name: file.name,
+        type: 'pdf',
+        size: file.size
+      };
+      renderProofPreview(previewContainerId);
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  // Compress image to readable OCR quality (max 1280px, ~60-120KB)
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1280;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+      currentProof = {
+        dataUrl: compressedDataUrl,
+        name: file.name,
+        type: 'image',
+        size: Math.round(compressedDataUrl.length * 0.75)
+      };
+      renderProofPreview(previewContainerId);
+    };
+    img.onerror = () => {
+      alert('Gagal memproses file foto nota.');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCurrentProof(previewContainerId) {
+  currentProof = null;
+  renderProofPreview(previewContainerId);
+}
+
+function renderProofPreview(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  if (!currentProof) {
+    el.innerHTML =
+      '<div style="border:1.5px dashed var(--line);border-radius:12px;padding:14px;text-align:center;background:var(--panel2);transition:all 0.2s">' +
+        '<div style="font-size:24px;margin-bottom:4px">🧾</div>' +
+        '<div class="small" style="font-weight:750;margin-bottom:2px">Lampirkan Bukti Fisik Nota / Kuitansi</div>' +
+        '<div class="tiny muted" style="margin-bottom:10px">Wajib untuk pelaporan SPJ, LPJ &amp; syarat e-Bupot Coretax DJP</div>' +
+        '<button type="button" class="btn sm pri" onclick="triggerProofInput(\'' + containerId + '\')">' +
+          '📷 Ambil Foto / Pilih Berkas' +
+        '</button>' +
+      '</div>';
+    return;
+  }
+
+  const isImg = currentProof.type === 'image';
+  const sizeKb = Math.round((currentProof.size || 0) / 1024);
+
+  el.innerHTML =
+    '<div class="card" style="background:var(--panel2);border:1.5px solid var(--ok);padding:10px 12px;display:flex;align-items:center;gap:12px">' +
+      (isImg ?
+        '<img src="' + esc(currentProof.dataUrl) + '" alt="Bukti" style="width:56px;height:56px;border-radius:8px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="viewProofModal(\'Pratinjau Bukti Terlampir\', currentProof.dataUrl, \'image\', currentProof.name)">' :
+        '<div style="width:56px;height:56px;border-radius:8px;background:rgba(225,29,72,0.12);color:var(--bad);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0">PDF</div>'
+      ) +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="small" style="font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(currentProof.name || 'Berkas Bukti') + '</div>' +
+        '<div class="tiny muted">' + (isImg ? 'Foto Nota/Kuitansi' : 'Dokumen PDF') + ' · ' + sizeKb + ' KB · <span style="color:var(--ok);font-weight:700">✓ Siap Disimpan</span></div>' +
+        '<div class="row" style="gap:10px;margin-top:4px">' +
+          '<button type="button" class="small link" style="font-weight:700" onclick="viewProofModal(\'Pratinjau Bukti Terlampir\', currentProof.dataUrl, currentProof.type, currentProof.name)">🔍 Lihat ›</button>' +
+          '<button type="button" class="small link" style="color:var(--bad);font-weight:700" onclick="removeCurrentProof(\'' + containerId + '\')">Hapus ×</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function triggerProofInput(containerId) {
+  const inp = document.getElementById(containerId + '-input');
+  if (inp) {
+    inp.value = '';
+    inp.click();
+  }
+}
+
+function viewProofModal(title, dataUrl, type, filename = 'bukti_nota') {
+  if (!dataUrl) {
+    toast('Berkas bukti tidak ditemukan.');
+    return;
+  }
+  const isImg = type === 'image' || (!type && dataUrl.startsWith('data:image'));
+
+  sheet(title || 'Bukti Dokumen Fisik',
+    '<div class="stack" style="align-items:center">' +
+      (isImg ?
+        '<div style="width:100%;max-height:58vh;overflow:auto;text-align:center;background:#090E11;border-radius:12px;padding:8px">' +
+          '<img src="' + esc(dataUrl) + '" alt="Bukti" style="max-width:100%;max-height:54vh;object-fit:contain;border-radius:8px">' +
+        '</div>' :
+        '<div class="card" style="background:var(--panel2);text-align:center;padding:24px;width:100%">' +
+          '<div style="font-size:42px;margin-bottom:8px">📄</div>' +
+          '<b style="font-size:16px;display:block">' + esc(filename) + '</b>' +
+          '<p class="small muted" style="margin:4px 0 14px">Dokumen format PDF siap diunduh untuk syarat pelaporan e-Bupot Coretax DJP &amp; SPJ riset.</p>' +
+          '<a href="' + esc(dataUrl) + '" download="' + esc(filename) + '" class="btn pri block" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px">⬇️ Unduh Berkas PDF</a>' +
+        '</div>'
+      ) +
+      '<div class="row" style="width:100%;gap:8px;margin-top:6px">' +
+        '<a href="' + esc(dataUrl) + '" download="' + esc(filename || 'bukti_nota.jpg') + '" class="btn pri block" style="flex:1;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px">⬇️ Unduh File Asli</a>' +
+        '<button class="btn block" style="flex:1" onclick="closeSheet()">Tutup</button>' +
+      '</div>' +
+    '</div>',
+    'Tutup',
+    () => closeSheet()
+  );
+}
+
+function attachProofToTxn(txnId) {
+  const t = S.txns.find(x => x.id === txnId);
+  if (!t) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  input.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const reader = new FileReader();
+    reader.onload = ev => {
+      if (isPdf) {
+        t.proof = ev.target.result;
+        t.proof_name = file.name;
+        t.proof_type = 'pdf';
+        t.spj_ok = true;
+        saveState();
+        toast('Bukti PDF berhasil dilampirkan ✓');
+        sheetTxnDetail(txnId);
+        render();
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+          else { w = Math.round((w * maxDim) / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        t.proof = canvas.toDataURL('image/jpeg', 0.82);
+        t.proof_name = file.name;
+        t.proof_type = 'image';
+        t.spj_ok = true;
+        saveState();
+        toast('Foto bukti nota berhasil dilampirkan ✓');
+        sheetTxnDetail(txnId);
+        render();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function removeProofFromTxn(txnId) {
+  if (!confirm('Hapus lampiran bukti nota ini?')) return;
+  const t = S.txns.find(x => x.id === txnId);
+  if (!t) return;
+  t.proof = null;
+  t.proof_name = null;
+  t.proof_type = null;
+  saveState();
+  toast('Lampiran bukti dihapus');
+  sheetTxnDetail(txnId);
+  render();
+}
+
+function attachProofToPayroll(payId) {
+  const pay = S.payrolls.find(p => p.id === payId);
+  if (!pay) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  input.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const applyProof = (dataUrl, pType) => {
+        pay.proof = dataUrl;
+        pay.proof_name = file.name;
+        pay.proof_type = pType;
+
+        const matchingTx = S.txns.find(t => t.ref === pay.ref && t.cat === 'honor');
+        if (matchingTx) {
+          matchingTx.proof = dataUrl;
+          matchingTx.proof_name = file.name;
+          matchingTx.proof_type = pType;
+          matchingTx.spj_ok = true;
+        }
+
+        saveState();
+        toast('Bukti transfer / slip gaji e-Bupot berhasil disimpan ✓');
+        sheetSlipDetail(payId);
+        render();
+      };
+
+      if (isPdf) {
+        applyProof(ev.target.result, 'pdf');
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+          else { w = Math.round((w * maxDim) / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        applyProof(canvas.toDataURL('image/jpeg', 0.82), 'image');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function removeProofFromPayroll(payId) {
+  if (!confirm('Hapus lampiran bukti transfer / slip gaji ini?')) return;
+  const pay = S.payrolls.find(p => p.id === payId);
+  if (!pay) return;
+  pay.proof = null;
+  pay.proof_name = null;
+  pay.proof_type = null;
+
+  const matchingTx = S.txns.find(t => t.ref === pay.ref && t.cat === 'honor');
+  if (matchingTx) {
+    matchingTx.proof = null;
+    matchingTx.proof_name = null;
+    matchingTx.proof_type = null;
+  }
+
+  saveState();
+  toast('Bukti transfer slip honor dihapus');
+  sheetSlipDetail(payId);
+  render();
+}
+
+/* ==========================================================================
    VIEW 2: KAS (Buku Kas Umum & Transaksi Masuk/Keluar)
    ========================================================================== */
 function vKas() {
@@ -2299,7 +2603,6 @@ function vKas() {
 
   list.sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
 
-  // Group by date
   const byDate = {};
   list.forEach(t => {
     (byDate[t.date] = byDate[t.date] || []).push(t);
@@ -2338,7 +2641,11 @@ function vKas() {
                 '</div>' +
                 '<div class="r">' +
                   '<b class="' + (t.dir === 'in' ? 'in-c' : 'out-c') + '">' + (t.dir === 'in' ? '+' : '−') + rpC(t.amount) + '</b>' +
-                  '<span>' + (t.spj_ok ? '✓ SPJ Ok' : 'Perlu Bukti') + '</span>' +
+                  '<span>' +
+                    (t.proof ? '<span class="pill ok" style="padding:1px 6px;font-size:9.5px;font-weight:750">📎 Nota Ada</span>' :
+                      (t.dir === 'out' ? '<span class="pill warning" style="padding:1px 6px;font-size:9.5px">⚠️ Tanpa Nota</span>' : '<span class="pill ok" style="padding:1px 6px;font-size:9.5px">Kas Masuk</span>')
+                    ) +
+                  '</span>' +
                 '</div>' +
               '</button>'
             ).join('')
@@ -2355,7 +2662,8 @@ function setKasFilter(f) {
 
 function sheetKasIn() {
   const p = P();
-  sheet('Catat Kas Masuk',
+  resetCurrentProof();
+  sheet('Catat Kas Masuk (Penerimaan Hibah)',
     '<div class="stack">' +
       fld('Tanggal Penerimaan', '<input type="date" id="f-date" value="' + today() + '">') +
       fld('Sumber Dana / Kategori',
@@ -2366,6 +2674,10 @@ function sheetKasIn() {
       fld('Nominal (Rp)', moneyIn('f-amount')) +
       fld('Nomor SP2D / Bukti Transfer', '<input id="f-ref" placeholder="Contoh: SP2D-DRTPM-7718/2026">') +
       fld('Keterangan', '<textarea id="f-note" placeholder="Pencairan termin awal 70%"></textarea>') +
+      fld('Bukti Penerimaan / SP2D / Rekening Koran',
+        '<input type="file" id="f-proof-in-preview-input" accept="image/*,application/pdf" style="display:none" onchange="handleProofFileSelect(event, \'f-proof-in-preview\')">' +
+        '<div id="f-proof-in-preview"></div>'
+      ) +
     '</div>',
     'Simpan Kas Masuk',
     () => {
@@ -2394,6 +2706,9 @@ function sheetKasIn() {
         ref,
         note,
         spj_ok: true,
+        proof: currentProof ? currentProof.dataUrl : null,
+        proof_name: currentProof ? currentProof.name : null,
+        proof_type: currentProof ? currentProof.type : null,
         void: false
       });
       saveState();
@@ -2402,10 +2717,12 @@ function sheetKasIn() {
       render();
     }
   );
+  setTimeout(() => renderProofPreview('f-proof-in-preview'), 50);
 }
 
 function sheetKasOut() {
   const p = P();
+  resetCurrentProof();
   sheet('Catat Kas Keluar (Belanja)',
     '<div class="stack">' +
       fld('Tanggal Pengeluaran', '<input type="date" id="f-date" value="' + today() + '">') +
@@ -2417,10 +2734,14 @@ function sheetKasOut() {
       fld('Nominal Total (Rp)', moneyIn('f-amount')) +
       fld('Nomor Kuitansi / Faktur / Nota', '<input id="f-ref" placeholder="Contoh: KWT-LAB-021 / FKT-991">') +
       fld('Keterangan Belanja', '<textarea id="f-note" placeholder="Keperluan penelitian..."></textarea>') +
+      fld('Bukti Fisik Nota / Kuitansi / Faktur',
+        '<input type="file" id="f-proof-out-preview-input" accept="image/*,application/pdf" style="display:none" onchange="handleProofFileSelect(event, \'f-proof-out-preview\')">' +
+        '<div id="f-proof-out-preview"></div>'
+      ) +
       fld('Kelengkapan Bukti SPJ',
         '<label class="row" style="cursor:pointer;font-weight:600">' +
           '<input type="checkbox" id="f-spj" checked style="width:20px;height:20px;accent-color:var(--helm)">' +
-          '<span>Bukti fisik nota / kuitansi / faktur lengkap</span>' +
+          '<span>Bukti fisik nota / kuitansi / faktur lengkap &amp; sah</span>' +
         '</label>'
       ) +
     '</div>',
@@ -2431,7 +2752,7 @@ function sheetKasOut() {
       const amount = parseN($('#f-amount').value);
       const ref = $('#f-ref').value.trim();
       const note = $('#f-note').value.trim();
-      const spj_ok = $('#f-spj').checked;
+      const spj_ok = $('#f-spj').checked || Boolean(currentProof);
       if (!amount) {
         $('#sheet-e').textContent = 'Masukkan nominal pengeluaran.';
         return;
@@ -2452,14 +2773,18 @@ function sheetKasOut() {
         ref,
         note,
         spj_ok,
+        proof: currentProof ? currentProof.dataUrl : null,
+        proof_name: currentProof ? currentProof.name : null,
+        proof_type: currentProof ? currentProof.type : null,
         void: false
       });
       saveState();
       closeSheet();
-      toast('Pengeluaran berhasil dicatat');
+      toast('Pengeluaran & bukti nota berhasil dicatat ✓');
       render();
     }
   );
+  setTimeout(() => renderProofPreview('f-proof-out-preview'), 50);
 }
 
 function sheetTxnDetail(id) {
@@ -2475,8 +2800,36 @@ function sheetTxnDetail(id) {
       fld('Kategori', '<div><b>' + (CAT_IN[t.cat] || CAT_OUT[t.cat] || t.cat) + '</b></div>') +
       fld('No Kuitansi / Bukti', '<div>' + esc(t.ref || '—') + '</div>') +
       fld('Keterangan', '<div>' + esc(t.note || '—') + '</div>') +
-      fld('Status SPJ', '<div>' + (t.spj_ok ? '<span class="pill ok">✓ Berkas Fisik Lengkap</span>' : '<span class="pill bad">Perlu Bukti Fisik</span>') + '</div>') +
-      '<button class="btn bad block" style="margin-top:12px" onclick="deleteTxn(\'' + t.id + '\')">Hapus / Batalkan Transaksi</button>' +
+      fld('Status Berkas SPJ', '<div>' + (t.spj_ok ? '<span class="pill ok">✓ Berkas Fisik Lengkap</span>' : '<span class="pill bad">⚠️ Perlu Bukti Fisik</span>') + '</div>') +
+
+      /* Lampiran Bukti Nota / Kuitansi */
+      '<div class="card stack" style="gap:8px;background:var(--panel2)">' +
+        '<div class="lab" style="font-weight:750">Lampiran Bukti Digital (Nota / Transfer)</div>' +
+        (t.proof ?
+          '<div class="row" style="gap:12px;align-items:center">' +
+            (t.proof_type === 'image' || t.proof.startsWith('data:image') ?
+              '<img src="' + esc(t.proof) + '" alt="Nota" style="width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="viewProofModal(\'Bukti Nota: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'nota.jpg') + '\')">' :
+              '<div style="width:64px;height:64px;border-radius:10px;background:rgba(225,29,72,0.12);color:var(--bad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;flex-shrink:0">PDF</div>'
+            ) +
+            '<div style="flex:1;min-width:0">' +
+              '<b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.proof_name || 'File Bukti Nota') + '</b>' +
+              '<div class="small ok" style="font-weight:700">✓ Bukti digital tersimpan</div>' +
+              '<div class="row" style="gap:10px;margin-top:6px">' +
+                '<button type="button" class="small link" style="font-weight:700" onclick="viewProofModal(\'Bukti Nota: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'nota.jpg') + '\')">🔍 Buka Foto</button>' +
+                '<a href="' + esc(t.proof) + '" download="' + esc(t.proof_name || 'bukti_nota.jpg') + '" class="small link" style="font-weight:700">⬇️ Unduh</a>' +
+                '<button type="button" class="small link" style="color:var(--info);font-weight:700" onclick="attachProofToTxn(\'' + t.id + '\')">Ganti</button>' +
+                '<button type="button" class="small link" style="color:var(--bad);font-weight:700" onclick="removeProofFromTxn(\'' + t.id + '\')">Hapus</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' :
+          '<div style="padding:4px 0">' +
+            '<div class="small muted" style="margin-bottom:8px">⚠️ Belum ada foto nota / bukti kuitansi digital untuk transaksi ini.</div>' +
+            '<button class="btn sm pri" onclick="attachProofToTxn(\'' + t.id + '\')">📷 Unggah Bukti Nota Sekarang</button>' +
+          '</div>'
+        ) +
+      '</div>' +
+
+      '<button class="btn bad block" style="margin-top:10px" onclick="deleteTxn(\'' + t.id + '\')">Hapus / Batalkan Transaksi</button>' +
     '</div>',
     'Tutup',
     () => closeSheet()
@@ -2721,7 +3074,11 @@ function vHonor() {
               '</div>' +
               '<div class="r">' +
                 '<b class="in-c">' + rpC(pay.netto) + '</b>' +
-                '<span>' + esc(pay.ref) + '</span>' +
+                '<span>' +
+                  (pay.proof ? '<span class="pill ok" style="padding:1px 6px;font-size:9.5px;font-weight:750">📎 Slip Ada</span>' :
+                    '<span class="pill warning" style="padding:1px 6px;font-size:9.5px">⚠️ Perlu Bukti</span>'
+                  ) +
+                '</span>' +
               '</div>' +
             '</button>';
           }).join('')
@@ -2737,6 +3094,7 @@ function sheetHonorNew(defaultWid = null) {
     alert('Tambahkan personel terlebih dahulu.');
     return;
   }
+  resetCurrentProof();
 
   sheet('Buat Slip Honorarium',
     '<div class="stack">' +
@@ -2754,9 +3112,13 @@ function sheetHonorNew(defaultWid = null) {
         '<div class="row between" style="margin-top:4px"><span class="small muted">Potongan Pajak:</span><b id="fh-tax" class="small num" style="color:var(--bad)">Rp 0</b></div>' +
         '<div class="row between" style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px"><span class="lab" style="font-weight:700">Netto Diterima:</span><b id="fh-netto" class="val num in-c" style="font-size:18px">Rp 0</b></div>' +
       '</div>' +
+      fld('Bukti Transfer Bank / Slip Gaji TTD (Syarat e-Bupot)',
+        '<input type="file" id="fh-proof-preview-input" accept="image/*,application/pdf" style="display:none" onchange="handleProofFileSelect(event, \'fh-proof-preview\')">' +
+        '<div id="fh-proof-preview"></div>'
+      ) +
       fld('Keterangan', '<input id="fh-note" placeholder="Honorarium kegiatan analisis data / survei...">') +
     '</div>',
-    'Cetak & Simpan Kuitansi',
+    'Simpan Slip Honor',
     () => {
       const wid = $('#fh-wid').value;
       const date = $('#fh-date').value || today();
@@ -2785,7 +3147,10 @@ function sheetHonorNew(defaultWid = null) {
         tax_amt,
         netto,
         note,
-        paid: true
+        paid: true,
+        proof: currentProof ? currentProof.dataUrl : null,
+        proof_name: currentProof ? currentProof.name : null,
+        proof_type: currentProof ? currentProof.type : null
       };
 
       S.payrolls.push(newPay);
@@ -2808,18 +3173,22 @@ function sheetHonorNew(defaultWid = null) {
         ref,
         note: (w ? w.name : 'Personel') + ' — ' + note,
         spj_ok: true,
+        proof: newPay.proof,
+        proof_name: newPay.proof_name,
+        proof_type: newPay.proof_type,
         void: false
       });
 
       saveState();
       closeSheet();
-      toast('Slip honor berhasil dibuat');
+      toast('Slip honor berhasil dibuat ✓');
       render();
       setTimeout(() => sheetSlipDetail(newPay.id), 300);
     }
   );
 
   setTimeout(calcHonorTax, 80);
+  setTimeout(() => renderProofPreview('fh-proof-preview'), 80);
 }
 
 function sheetHonorForWorker(wid) {
@@ -2939,7 +3308,7 @@ function sheetSlipDetail(payId) {
   const p = P();
   const g = GOL_RULES[w ? w.golongan : 'non_pns_npwp'] || GOL_RULES['non_pns_npwp'];
 
-  sheet('Kuitansi Resmi LPJ',
+  sheet('Kuitansi Resmi LPJ & e-Bupot',
     '<div class="stack">' +
       '<div class="print-slip card" style="background:#fff;color:#000;border:1px solid #cbd5e1;padding:16px;font-family:Arial,sans-serif">' +
         '<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px">' +
@@ -2978,18 +3347,122 @@ function sheetSlipDetail(payId) {
         '</div>' +
       '</div>' +
 
+      /* Lampiran Bukti Transfer & Slip Gaji e-Bupot */
+      '<div class="card stack" style="gap:8px;background:var(--panel2)">' +
+        '<div class="row between">' +
+          '<div class="lab" style="font-weight:750">Bukti Transfer &amp; Dokumen e-Bupot Coretax</div>' +
+          (pay.proof ? '<span class="pill ok" style="font-size:10.5px">✓ Siap e-Bupot</span>' : '<span class="pill warning" style="font-size:10.5px">⚠️ Perlu Bukti</span>') +
+        '</div>' +
+        (pay.proof ?
+          '<div class="row" style="gap:12px;align-items:center">' +
+            (pay.proof_type === 'image' || pay.proof.startsWith('data:image') ?
+              '<img src="' + esc(pay.proof) + '" alt="Bukti Transfer" style="width:68px;height:68px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="viewProofModal(\'Bukti Transfer: ' + esc(pay.ref) + '\', \'' + esc(pay.proof) + '\', \'' + esc(pay.proof_type || 'image') + '\', \'' + esc(pay.proof_name || 'bukti_transfer.jpg') + '\')">' :
+              '<div style="width:68px;height:68px;border-radius:10px;background:rgba(225,29,72,0.12);color:var(--bad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;flex-shrink:0">PDF</div>'
+            ) +
+            '<div style="flex:1;min-width:0">' +
+              '<b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(pay.proof_name || 'Slip_Gaji_Transfer.jpg') + '</b>' +
+              '<div class="tiny muted" style="margin-top:2px">Bukti siap diunggah saat pelaporan bukti potong PPh 21 e-Bupot DJP.</div>' +
+              '<div class="row" style="gap:10px;margin-top:6px">' +
+                '<button type="button" class="small link" style="font-weight:700" onclick="viewProofModal(\'Bukti Transfer: ' + esc(pay.ref) + '\', \'' + esc(pay.proof) + '\', \'' + esc(pay.proof_type || 'image') + '\', \'' + esc(pay.proof_name || 'bukti_transfer.jpg') + '\')">🔍 Buka Foto</button>' +
+                '<a href="' + esc(pay.proof) + '" download="' + esc(pay.proof_name || 'slip_gaji_' + esc(w?.name || 'honor') + '.jpg') + '" class="small link" style="font-weight:700">⬇️ Unduh File</a>' +
+                '<button type="button" class="small link" style="color:var(--info);font-weight:700" onclick="attachProofToPayroll(\'' + pay.id + '\')">Ganti</button>' +
+                '<button type="button" class="small link" style="color:var(--bad);font-weight:700" onclick="removeProofFromPayroll(\'' + pay.id + '\')">Hapus</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' :
+          '<div style="padding:4px 0">' +
+            '<p class="small muted" style="margin:0 0 10px">Bukti transfer atau slip gaji bertanda tangan belum dilampirkan. Lampirkan foto struk m-banking atau scan kuitansi sebagai syarat lampiran e-Bupot Coretax DJP.</p>' +
+            '<button class="btn sm pri block" onclick="attachProofToPayroll(\'' + pay.id + '\')">📷 Unggah Bukti Transfer / Slip TTD</button>' +
+          '</div>'
+        ) +
+      '</div>' +
+
       (canApprove() ?
-        '<button class="btn block" style="margin-top:8px;background:var(--panel2);border:1px solid var(--ok);color:var(--ok);font-weight:750" onclick="toggleApprovePayroll(\'' + pay.id + '\')">' +
+        '<button class="btn block" style="margin-top:4px;background:var(--panel2);border:1px solid var(--ok);color:var(--ok);font-weight:750" onclick="toggleApprovePayroll(\'' + pay.id + '\')">' +
           (pay.approved ? '✓ Kuitansi Telah Disetujui Ketua' : '✍️ Tanda Tangan &amp; Setujui Kuitansi Ini') +
         '</button>' : '') +
-      '<div class="row" style="gap:8px;margin-top:10px">' +
-        '<button class="btn pri block" style="flex:1" onclick="window.print()">Cetak / Simpan PDF</button>' +
-        '<button class="btn bad block" style="flex:1" onclick="deletePayroll(\'' + pay.id + '\')">Batalkan Slip</button>' +
+
+      '<div class="row" style="gap:8px;margin-top:6px">' +
+        '<button class="btn pri block" style="flex:1" onclick="downloadOfficialSlip(\'' + pay.id + '\')">⬇️ Unduh Slip Resmi e-Bupot</button>' +
+        '<button class="btn block" style="flex:1" onclick="window.print()">🖨️ Cetak</button>' +
       '</div>' +
+      '<button class="btn bad block" style="margin-top:6px" onclick="deletePayroll(\'' + pay.id + '\')">Batalkan Slip Honor</button>' +
     '</div>',
     'Tutup',
     () => closeSheet()
   );
+}
+
+function downloadOfficialSlip(payId) {
+  const pay = S.payrolls.find(p => p.id === payId);
+  if (!pay) return;
+  const w = S.workers.find(x => x.id === pay.wid);
+  const p = P();
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Slip Kuitansi Honorarium — ${esc(pay.ref)}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1e293b; line-height: 1.5; background: #fff; }
+  .box { max-width: 680px; margin: 0 auto; border: 2px solid #0f172a; padding: 24px; border-radius: 8px; }
+  .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+  .title { font-size: 16px; font-weight: 800; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  td { padding: 6px 4px; vertical-align: top; }
+  .line { border-top: 1px dashed #94a3b8; }
+  .ttd-box { display: flex; justify-content: space-between; margin-top: 36px; text-align: center; font-size: 13px; }
+  .sign-col { width: 45%; }
+  .stamp { height: 60px; display: flex; align-items: center; justify-content: center; color: #10b981; font-weight: bold; }
+  @media print { body { padding: 0; } .box { border: 1.5px solid #000; } }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="header">
+    <div style="font-size: 12px; font-weight: bold; text-transform: uppercase;">KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI</div>
+    <div style="font-size: 11px; color: #475569;">${esc(p.institution || 'Lembaga Penelitian dan Pengabdian kepada Masyarakat')}</div>
+    <div class="title">TANDA TERIMA HONORARIUM / SLIP GAJI RISET</div>
+    <div style="font-size: 12px; color: #64748b;">Nomor Kuitansi: <b>${esc(pay.ref)}</b> · Tanggal: ${fdl(pay.date)}</div>
+  </div>
+  <table>
+    <tr><td style="width: 160px; color: #475569;">Proyek Penelitian</td><td style="width: 10px;">:</td><td><b>${esc(p.name)}</b></td></tr>
+    <tr><td style="color: #475569;">Penerima Honor</td><td>:</td><td><b>${esc(w ? w.name : '—')}</b></td></tr>
+    <tr><td style="color: #475569;">Peran / Posisi</td><td>:</td><td>${esc(w ? w.role : '—')}</td></tr>
+    <tr><td style="color: #475569;">NIK (KTP)</td><td>:</td><td><b>${esc(w ? w.nik : '—')}</b></td></tr>
+    <tr><td style="color: #475569;">NPWP</td><td>:</td><td>${esc(w && w.npwp ? w.npwp : 'Non-NPWP (Pemadanan NIK)')}</td></tr>
+    <tr><td style="color: #475569;">Keterangan Kegiatan</td><td>:</td><td>${esc(pay.note || pay.period)}</td></tr>
+    <tr><td style="color: #475569;">Honorarium Bruto</td><td>:</td><td><b>${rpC(pay.gross)}</b></td></tr>
+    <tr><td style="color: #475569;">Potongan PPh 21 (${(pay.tax_rate * 100).toFixed(1)}%)</td><td>:</td><td style="color: #dc2626;">( ${rpC(pay.tax_amt)} )</td></tr>
+    <tr class="line"><td style="font-weight: bold; font-size: 15px;">Jumlah Netto Diterima</td><td>:</td><td style="font-weight: bold; font-size: 15px; color: #15803d;">${rpC(pay.netto)}</td></tr>
+    <tr><td style="color: #475569;">Terbilang</td><td>:</td><td style="font-style: italic;"># ${rpWords(pay.netto)} #</td></tr>
+  </table>
+  <div class="ttd-box">
+    <div class="sign-col">
+      <div>Menyetujui,</div><div>Ketua Peneliti</div>
+      <div class="stamp">${pay.approved ? '✓ TELAH DISAHKAN' : '[ Tanda Tangan ]'}</div>
+      <div><b><u>${esc(p.leader)}</u></b></div>
+    </div>
+    <div class="sign-col">
+      <div>${fdl(pay.date)}</div><div>Yang Menerima,</div>
+      <div class="stamp" style="color: #94a3b8; font-size: 11px;">[ Meterai / TTD ]</div>
+      <div><b><u>${esc(w ? w.name : 'Penerima')}</u></b></div>
+    </div>
+  </div>
+</div>
+` + '<' + 'script>window.onload = function() { window.print(); };<' + '/script>' + `
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Slip_Honor_${(w ? w.name : 'Personel').replace(/[^a-zA-Z0-9]/g, '_')}_${pay.ref}.html`;
+    a.click();
+  }
 }
 
 function toggleApprovePayroll(payId) {
@@ -3223,7 +3696,7 @@ function vPajak() {
 
 function exportCoretaxCSV() {
   const pays = payrollsOf(P().id);
-  let csv = 'Kode Pajak,Nama Penerima,NIK (16 Digit),NPWP,Bruto,Tarif Pajak,Potongan PPh 21,Tanggal,No Bukti Potong\n';
+  let csv = 'Kode Pajak,Nama Penerima,NIK (16 Digit),NPWP,Bruto,Tarif Pajak,Potongan PPh 21,Tanggal,No Bukti Potong,Status Bukti Slip\n';
   pays.forEach(pay => {
     const w = S.workers.find(x => x.id === pay.wid);
     csv += [
@@ -3235,7 +3708,8 @@ function exportCoretaxCSV() {
       (pay.tax_rate * 100).toFixed(1) + '%',
       pay.tax_amt,
       pay.date,
-      pay.ref
+      pay.ref,
+      pay.proof ? '"Ada Bukti (' + (pay.proof_name || 'Tersimpan') + ')"' : '"Belum Upload Slip"'
     ].join(',') + '\n';
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -4004,6 +4478,11 @@ function vSpj() {
   const doneCount = items.filter(([k]) => c[k]).length;
   const pct = Math.round((doneCount / items.length) * 100);
 
+  const txOut = txnsOf(p.id).filter(t => t.dir === 'out');
+  const txWithProof = txOut.filter(t => Boolean(t.proof)).length;
+  const pays = payrollsOf(p.id);
+  const payWithProof = pays.filter(p => Boolean(p.proof)).length;
+
   return '<div class="stack">' +
     backBar('Checklist Kelengkapan SPJ') +
     '<div class="card">' +
@@ -4013,6 +4492,23 @@ function vSpj() {
       '</div>' +
       '<div class="ruler"><i style="width:' + pct + '%"></i></div>' +
       '<div class="sub">' + doneCount + ' dari ' + items.length + ' syarat mutlak berkas SPJ sudah diverifikasi</div>' +
+    '</div>' +
+
+    /* Ringkasan Bukti Digital yang Terunggah */
+    '<div class="card stack" style="gap:10px;background:var(--panel2)">' +
+      '<div class="lab" style="font-weight:750">Status Bukti Digital &amp; e-Bupot Terunggah</div>' +
+      '<div class="grid2">' +
+        '<div style="background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--line)">' +
+          '<div class="small muted">Nota Belanja Kas</div>' +
+          '<div style="font-size:18px;font-weight:800;margin:2px 0">' + txWithProof + ' / ' + txOut.length + ' <span style="font-size:12px;font-weight:600">terlampir</span></div>' +
+          (txOut.length > txWithProof ? '<span class="pill warning" style="font-size:10px;padding:1px 6px">⚠️ ' + (txOut.length - txWithProof) + ' belum ada nota</span>' : '<span class="pill ok" style="font-size:10px;padding:1px 6px">✓ Semua ada nota</span>') +
+        '</div>' +
+        '<div style="background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--line)">' +
+          '<div class="small muted">Bukti Transfer Honor</div>' +
+          '<div style="font-size:18px;font-weight:800;margin:2px 0">' + payWithProof + ' / ' + pays.length + ' <span style="font-size:12px;font-weight:600">terlampir</span></div>' +
+          (pays.length > payWithProof ? '<span class="pill warning" style="font-size:10px;padding:1px 6px">⚠️ ' + (pays.length - payWithProof) + ' perlu slip e-Bupot</span>' : '<span class="pill ok" style="font-size:10px;padding:1px 6px">✓ Lengkap</span>') +
+        '</div>' +
+      '</div>' +
     '</div>' +
 
     '<div class="card list">' +
@@ -4186,7 +4682,7 @@ function exportBKU() {
     ['Ketua Peneliti: ' + p.leader],
     ['Tahun Anggaran: ' + p.year],
     [],
-    ['No', 'Tanggal', 'No Bukti', 'Kategori', 'Keterangan', 'Penerimaan (Rp)', 'Pengeluaran (Rp)', 'Saldo (Rp)']
+    ['No', 'Tanggal', 'No Bukti', 'Kategori', 'Keterangan', 'Penerimaan (Rp)', 'Pengeluaran (Rp)', 'Saldo (Rp)', 'Lampiran Bukti']
   ];
 
   tx.forEach((t, i) => {
@@ -4201,7 +4697,8 @@ function exportBKU() {
       t.note || '',
       deb,
       krd,
-      saldo
+      saldo,
+      t.proof ? 'Ada Bukti (' + (t.proof_name || 'Tersimpan') + ')' : (t.dir === 'out' ? 'Belum Ada Nota' : 'Penerimaan')
     ]);
   });
 
