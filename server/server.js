@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users(
   username TEXT UNIQUE NOT NULL COLLATE NOCASE,
   name TEXT NOT NULL,
   role TEXT NOT NULL,
+  avatar TEXT,
   pass TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1,
   perm_rev INTEGER NOT NULL DEFAULT 1,
@@ -102,6 +103,10 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
 `);
 
+try {
+  db.exec("ALTER TABLE users ADD COLUMN avatar TEXT;");
+} catch (e) {}
+
 // Migrate users table if it has restrictive CHECK constraint
 try {
   const usersSqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
@@ -115,12 +120,14 @@ try {
         username TEXT UNIQUE NOT NULL COLLATE NOCASE,
         name TEXT NOT NULL,
         role TEXT NOT NULL,
+        avatar TEXT,
         pass TEXT NOT NULL,
         active INTEGER NOT NULL DEFAULT 1,
         perm_rev INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL
       );
-      INSERT INTO users_new SELECT id, username, name, role, pass, active, perm_rev, created_at FROM users;
+      INSERT INTO users_new (id, username, name, role, pass, active, perm_rev, created_at)
+        SELECT id, username, name, role, pass, active, perm_rev, created_at FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
       COMMIT;
@@ -216,7 +223,7 @@ function getSessionUser(req) {
   const token = cookies.zanfin_session;
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.name, u.role, u.active, s.expires
+    SELECT u.id, u.username, u.name, u.role, u.avatar, u.active, s.expires
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token = ? AND s.expires > ? AND u.active = 1
@@ -317,7 +324,7 @@ const BACKUP_DIR = path.join(DATA, 'backups');
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 function generateBackupData(trigger = 'manual', user = null) {
-  const users = db.prepare('SELECT id, username, name, role, pass, active, perm_rev, created_at FROM users').all();
+  const users = db.prepare('SELECT id, username, name, role, avatar, pass, active, perm_rev, created_at FROM users').all();
   const roles = db.prepare('SELECT id, name, tag, icon, badge_class, description, perms, system, created_at FROM roles').all();
   const records = db.prepare('SELECT coll, id, pid, data, deleted, rev, updated_at, updated_by FROM records').all();
   const counter = db.prepare('SELECT k, v FROM counter').all();
@@ -496,7 +503,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       return sendJson(res, 200, {
-        user: { id: user.id, username: user.username, name: user.name, role: user.role }
+        user: { id: user.id, username: user.username, name: user.name, role: user.role, avatar: user.avatar }
       }, { 'Set-Cookie': cookie });
     }
 
@@ -518,6 +525,58 @@ const server = http.createServer(async (req, res) => {
       const user = getSessionUser(req);
       if (!user) return sendJson(res, 401, { error: 'Unauthorized' });
       return sendJson(res, 200, { user });
+    }
+
+    if (pathname === '/api/me/profile' && req.method === 'POST') {
+      const user = getSessionUser(req);
+      if (!user) return sendJson(res, 401, { error: 'Unauthorized' });
+      const body = JSON.parse(await readBody(req));
+      const { name, avatar } = body;
+      if (!name || !name.trim()) {
+        return sendJson(res, 400, { error: 'Nama lengkap tidak boleh kosong' });
+      }
+
+      let avatarVal = user.avatar;
+      if (avatar !== undefined) {
+        avatarVal = avatar ? String(avatar) : null;
+      }
+
+      db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(name.trim(), avatarVal, user.id);
+      recordAudit(req, user, 'PROFILE_UPDATE', 'tim', `Pengguna "${name.trim()}" (@${user.username}) memperbarui foto profil & data`);
+
+      const updatedUser = {
+        id: user.id,
+        username: user.username,
+        name: name.trim(),
+        role: user.role,
+        avatar: avatarVal,
+        active: user.active
+      };
+      return sendJson(res, 200, { ok: true, user: updatedUser });
+    }
+
+    if (pathname === '/api/me/password' && req.method === 'POST') {
+      const user = getSessionUser(req);
+      if (!user) return sendJson(res, 401, { error: 'Unauthorized' });
+      const body = JSON.parse(await readBody(req));
+      const { oldPassword, newPassword } = body;
+      if (!oldPassword || !newPassword) {
+        return sendJson(res, 400, { error: 'Password lama dan password baru wajib diisi' });
+      }
+      if (newPassword.length < 6) {
+        return sendJson(res, 400, { error: 'Password baru minimal 6 karakter' });
+      }
+
+      const fullUser = db.prepare('SELECT pass FROM users WHERE id = ?').get(user.id);
+      if (!fullUser || !verifyPass(oldPassword, fullUser.pass)) {
+        return sendJson(res, 400, { error: 'Password lama tidak sesuai' });
+      }
+
+      const hash = hashPass(newPassword);
+      db.prepare('UPDATE users SET pass = ? WHERE id = ?').run(hash, user.id);
+      recordAudit(req, user, 'PASSWORD_CHANGE', 'auth', `Pengguna "${user.name}" (@${user.username}) berhasil mengubah kata sandi akun`);
+
+      return sendJson(res, 200, { ok: true, message: 'Password berhasil diubah' });
     }
 
     if (pathname === '/api/sync' && req.method === 'POST') {
@@ -597,13 +656,13 @@ const server = http.createServer(async (req, res) => {
       }
       
       if (req.method === 'GET') {
-        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        const users = db.prepare('SELECT id, username, name, role, avatar, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { users });
       }
 
       if (req.method === 'POST') {
         const body = JSON.parse(await readBody(req));
-        const { id, username, name, role, pass, active } = body;
+        const { id, username, name, role, avatar, pass, active } = body;
 
         // Security restriction for operational admin:
         if (user.role === 'admin') {
@@ -618,16 +677,30 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
+        const avatarVal = avatar !== undefined ? (avatar ? String(avatar) : null) : undefined;
+
         if (id) {
           if (pass && pass.trim()) {
             const hash = hashPass(pass.trim());
-            db.prepare('UPDATE users SET name = ?, role = ?, pass = ?, active = ? WHERE id = ?').run(
-              name || username, role || 'peneliti', hash, active !== false ? 1 : 0, id
-            );
+            if (avatarVal !== undefined) {
+              db.prepare('UPDATE users SET name = ?, role = ?, pass = ?, active = ?, avatar = ? WHERE id = ?').run(
+                name || username, role || 'peneliti', hash, active !== false ? 1 : 0, avatarVal, id
+              );
+            } else {
+              db.prepare('UPDATE users SET name = ?, role = ?, pass = ?, active = ? WHERE id = ?').run(
+                name || username, role || 'peneliti', hash, active !== false ? 1 : 0, id
+              );
+            }
           } else {
-            db.prepare('UPDATE users SET name = ?, role = ?, active = ? WHERE id = ?').run(
-              name || username, role || 'peneliti', active !== false ? 1 : 0, id
-            );
+            if (avatarVal !== undefined) {
+              db.prepare('UPDATE users SET name = ?, role = ?, active = ?, avatar = ? WHERE id = ?').run(
+                name || username, role || 'peneliti', active !== false ? 1 : 0, avatarVal, id
+              );
+            } else {
+              db.prepare('UPDATE users SET name = ?, role = ?, active = ? WHERE id = ?').run(
+                name || username, role || 'peneliti', active !== false ? 1 : 0, id
+              );
+            }
           }
           recordAudit(req, user, 'USER_UPDATE', 'tim', `Memperbarui akun pengguna "${name || username}" (${role})`);
         } else {
@@ -636,8 +709,8 @@ const server = http.createServer(async (req, res) => {
           }
           const hash = hashPass(pass.trim());
           try {
-            db.prepare('INSERT INTO users (username, name, role, pass, active, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
-              username.toLowerCase().trim(), name || username, role || 'peneliti', hash, active !== false ? 1 : 0, Date.now()
+            db.prepare('INSERT INTO users (username, name, role, avatar, pass, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+              username.toLowerCase().trim(), name || username, role || 'peneliti', avatarVal || null, hash, active !== false ? 1 : 0, Date.now()
             );
             recordAudit(req, user, 'USER_CREATE', 'tim', `Membuat akun baru "${name || username}" (@${username.toLowerCase().trim()}) role: ${role}`);
           } catch (e) {
@@ -647,7 +720,7 @@ const server = http.createServer(async (req, res) => {
             throw e;
           }
         }
-        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        const users = db.prepare('SELECT id, username, name, role, avatar, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
       }
 
@@ -666,7 +739,7 @@ const server = http.createServer(async (req, res) => {
 
         db.prepare('DELETE FROM users WHERE id = ?').run(id);
         recordAudit(req, user, 'USER_DELETE', 'tim', `Menghapus akun pengguna "${target.name} (@${target.username})"`);
-        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        const users = db.prepare('SELECT id, username, name, role, avatar, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
       }
     }
@@ -1001,11 +1074,11 @@ const server = http.createServer(async (req, res) => {
         if (Array.isArray(users) && users.length > 0) {
           db.exec('DELETE FROM users');
           const insUser = db.prepare(`
-            INSERT INTO users (id, username, name, role, pass, active, perm_rev, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (id, username, name, role, avatar, pass, active, perm_rev, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `);
           for (const u of users) {
-            insUser.run(u.id, u.username, u.name, u.role, u.pass, u.active !== 0 ? 1 : 0, u.perm_rev || 1, u.created_at || Date.now());
+            insUser.run(u.id, u.username, u.name, u.role, u.avatar || null, u.pass, u.active !== 0 ? 1 : 0, u.perm_rev || 1, u.created_at || Date.now());
           }
         }
 

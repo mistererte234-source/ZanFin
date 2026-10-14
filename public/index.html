@@ -395,6 +395,39 @@ button.card { text-align: left; cursor: pointer; width: 100%; }
   font-size: 14px;
   flex: none;
 }
+/* iOS Premium Avatar & Badges */
+.ios-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  user-select: none;
+}
+.ios-avatar:hover {
+  transform: scale(1.02);
+}
+.ios-avatar-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  background: var(--helm);
+  color: #fff;
+  border: 2.5px solid var(--panel2);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  transition: transform 0.15s ease;
+  padding: 0;
+}
+.ios-avatar-badge:hover {
+  transform: scale(1.12);
+}
 .list .it .t { flex: 1; min-width: 0; }
 .list .it .t b {
   display: block;
@@ -1798,6 +1831,63 @@ function today() {
   return y + '-' + m + '-' + day;
 }
 
+/* Avatar & Monogram helpers (iOS Premium Design) */
+function getInitials(name) {
+  if (!name) return 'U';
+  const clean = String(name)
+    .replace(/\b(Dr|Ir|Hj|H|Prof|S\.?E|M\.?Kes|S\.?KM|M\.?Kom|S\.?T|M\.?Si|S\.?Kom|Ph\.?D)\b\.?/gi, '')
+    .replace(/[,\.]/g, ' ')
+    .trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  if (parts.length === 1 && parts[0].length >= 2) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return (String(name).trim()[0] || 'U').toUpperCase();
+}
+
+function getRoleGradient(role) {
+  switch (role) {
+    case 'superadmin':
+      return 'linear-gradient(135deg, #7c3aed, #4f46e5)';
+    case 'admin':
+      return 'linear-gradient(135deg, #0284c7, #2563eb)';
+    case 'ketua':
+      return 'linear-gradient(135deg, #059669, #0d9488)';
+    case 'bendahara':
+      return 'linear-gradient(135deg, #d97706, #ea580c)';
+    case 'peneliti':
+      return 'linear-gradient(135deg, #9333ea, #db2777)';
+    case 'asisten':
+      return 'linear-gradient(135deg, #0891b2, #0284c7)';
+    default:
+      return 'linear-gradient(135deg, #475569, #334155)';
+  }
+}
+
+function renderAvatar(u, size = 36, extraStyle = '') {
+  const user = (typeof u === 'string') ? { name: u } : (u || {});
+  const avatar = user.avatar;
+  const name = user.name || user.username || 'Pengguna';
+  const role = user.role || 'bendahara';
+
+  if (avatar && avatar.length > 20) {
+    return '<img src="' + esc(avatar) + '" alt="' + esc(name) + '" class="ios-avatar" ' +
+      'style="width:' + size + 'px;height:' + size + 'px;min-width:' + size + 'px;min-height:' + size + 'px;border-radius:50%;object-fit:cover;border:1.5px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-shrink:0;' + extraStyle + '">';
+  }
+
+  const inits = getInitials(name);
+  const grad = getRoleGradient(role);
+  const fontSize = Math.max(9, Math.round(size * 0.38));
+
+  return '<div class="ios-avatar" ' +
+    'style="width:' + size + 'px;height:' + size + 'px;min-width:' + size + 'px;min-height:' + size + 'px;border-radius:50%;background:' + grad + ';color:#ffffff;font-weight:750;font-size:' + fontSize + 'px;line-height:1;display:inline-flex;align-items:center;justify-content:center;letter-spacing:0.5px;border:1.5px solid rgba(255,255,255,0.25);box-shadow:0 2px 8px rgba(0,0,0,0.12);flex-shrink:0;user-select:none;' + extraStyle + '">' +
+    esc(inits) +
+  '</div>';
+}
+
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
@@ -2027,17 +2117,18 @@ function vNadi() {
   const ws = workersOf(p.id);
 
   const curRole = ROLES[CURRENT_ROLE] || ROLES.bendahara;
+  const userObj = ME || { name: curRole.person || curRole.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
   return '<div class="stack">' +
-    '<div class="card" style="background:var(--panel2);border-left:4px solid ' + curRole.color + ';padding:10px 14px" onclick="sheetSwitchRole()">' +
-      '<div class="row between">' +
-        '<div class="row" style="gap:8px">' +
-          '<span style="font-size:20px">' + curRole.icon + '</span>' +
+    '<div class="card" style="background:var(--panel2);border-left:4px solid ' + curRole.color + ';padding:10px 14px;cursor:pointer" onclick="sheetSwitchRole()">' +
+      '<div class="row between" style="align-items:center">' +
+        '<div class="row" style="gap:10px;align-items:center">' +
+          renderAvatar(userObj, 40) +
           '<div>' +
             '<div class="tiny muted" style="font-weight:700;text-transform:uppercase">Masuk Sebagai ' + curRole.name + '</div>' +
-            '<b style="font-size:14.5px">' + (curRole.person || esc(ME?.name || 'Administrator')) + '</b>' +
+            '<b style="font-size:15px">' + esc(userObj.name) + '</b>' +
           '</div>' +
         '</div>' +
-        '<span class="small link" style="font-weight:700">Ganti Peran ›</span>' +
+        '<span class="small link" style="font-weight:700">Profil ›</span>' +
       '</div>' +
     '</div>' +
 
@@ -3012,10 +3103,10 @@ function vLainnya() {
         '<div class="r">›</div>' +
       '</button>' +
       '<button class="it" onclick="go(null, \'akun\')">' +
-        '<div class="avatar">⚙️</div>' +
-        '<div class="t">' +
-          '<b>Akun Saya &amp; Sinkronisasi</b>' +
-          '<span>' + (ME ? esc(ME.name) + ' (' + (ROLE_L[ME.role] || ME.role) + ')' : 'Mode Lokal Browser') + '</span>' +
+        renderAvatar(ME || { name: curRole.name, role: CURRENT_ROLE }, 40) +
+        '<div class="t" style="margin-left:8px">' +
+          '<b>Profil Saya &amp; Keamanan</b>' +
+          '<span>' + (ME ? esc(ME.name) + ' · Ganti Foto &amp; Password' : 'Atur foto, password &amp; sinkronisasi') + '</span>' +
         '</div>' +
         '<div class="r">›</div>' +
       '</button>' +
@@ -3333,8 +3424,8 @@ function vUsers() {
       list.map(u => {
         const r = ROLES[u.role] || ROLES.bendahara;
         return '<button class="it" onclick="sheetUserEdit(' + u.id + ')">' +
-          '<div class="avatar">' + (r.icon || '👤') + '</div>' +
-          '<div class="t">' +
+          renderAvatar(u, 40) +
+          '<div class="t" style="margin-left:8px">' +
             '<b>' + esc(u.name) + (u.active ? '' : ' <span class="pill bad">Nonaktif</span>') + (u.id === ME?.id ? ' <span class="pill ok" style="padding:1px 6px;font-size:10px">Akun Anda</span>' : '') + '</b>' +
             '<span>@' + esc(u.username) + ' · <span class="pill ' + (r.badgeClass || 'info') + '" style="padding:1px 6px;font-size:10px">' + esc(r.name) + '</span></span>' +
           '</div>' +
@@ -3383,6 +3474,14 @@ function sheetUserEdit(userId = null) {
 
   sheet(u ? 'Edit Pengguna' : 'Tambah Pengguna Baru',
     '<div class="stack">' +
+      (u ?
+        '<div class="row" style="gap:12px;align-items:center;padding:4px 0 8px">' +
+          renderAvatar(u, 48) +
+          '<div>' +
+            '<b style="font-size:16px">' + esc(u.name) + '</b>' +
+            '<div class="small muted">@' + esc(u.username) + '</div>' +
+          '</div>' +
+        '</div>' : '') +
       fld('Username Akun', '<input id="fu-uname" value="' + esc(u ? u.username : '') + '" ' + (u ? 'disabled' : '') + ' placeholder="budi_bendahara">') +
       fld('Nama Lengkap', '<input id="fu-name" value="' + esc(u ? u.name : '') + '" placeholder="Budi Santoso, S.Kom">') +
       fld('Peran Akun',
@@ -4110,27 +4209,256 @@ function exportPajakExcel() {
   exportCoretaxCSV();
 }
 
-/* Sub-View: Akun & Sinkronisasi */
+/* ==========================================================================
+   USER PROFILE & SELF-SERVICE SECURITY (Apple ID Style)
+   ========================================================================== */
+function triggerAvatarUpload() {
+  const input = $('#f-avatar-upload');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+async function handleAvatarFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    toast('File harus berupa gambar (JPG, PNG, WebP).');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = async function() {
+      try {
+        const targetSize = 320;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
+
+        await saveProfileAvatar(compressedBase64);
+      } catch (err) {
+        toast('Gagal memproses gambar: ' + err.message);
+      }
+    };
+    img.onerror = function() {
+      toast('File gambar tidak valid atau rusak.');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveProfileAvatar(avatarBase64) {
+  try {
+    const r = await fetch('/api/me/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: ME ? ME.name : undefined,
+        avatar: avatarBase64
+      })
+    });
+    const res = await r.json();
+    if (r.ok && res.user) {
+      ME = res.user;
+      toast(avatarBase64 ? 'Foto profil berhasil diperbarui! ✨' : 'Foto profil dihapus.');
+      renderHeader();
+      render();
+      if (typeof loadUsers === 'function') loadUsers();
+    } else {
+      toast('Gagal: ' + (res.error || 'Server menolak update'));
+    }
+  } catch (err) {
+    toast('Koneksi error: ' + err.message);
+  }
+}
+
+async function removeAvatarPhoto() {
+  if (!confirm('Hapus foto profil dan kembali gunakan inisial nama?')) return;
+  await saveProfileAvatar(null);
+}
+
+async function doSaveProfileName() {
+  const nameInput = $('#prof-name');
+  if (!nameInput) return;
+  const newName = nameInput.value.trim();
+  if (!newName) {
+    toast('Nama lengkap tidak boleh kosong.');
+    return;
+  }
+  try {
+    const r = await fetch('/api/me/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newName,
+        avatar: ME ? ME.avatar : undefined
+      })
+    });
+    const res = await r.json();
+    if (r.ok && res.user) {
+      ME = res.user;
+      toast('Nama profil berhasil disimpan! ✨');
+      renderHeader();
+      render();
+      if (typeof loadUsers === 'function') loadUsers();
+    } else {
+      toast('Gagal: ' + (res.error || 'Gagal menyimpan nama'));
+    }
+  } catch (err) {
+    toast('Koneksi gagal: ' + err.message);
+  }
+}
+
+async function doChangePassword() {
+  const oldPass = $('#acc-oldpass')?.value || '';
+  const newPass = $('#acc-newpass')?.value || '';
+  const confirmPass = $('#acc-confirmpass')?.value || '';
+  const errEl = $('#acc-pass-err');
+
+  if (errEl) errEl.textContent = '';
+
+  if (!oldPass) {
+    if (errEl) errEl.textContent = 'Masukkan password saat ini.';
+    return;
+  }
+  if (!newPass || newPass.length < 6) {
+    if (errEl) errEl.textContent = 'Password baru minimal 6 karakter.';
+    return;
+  }
+  if (newPass !== confirmPass) {
+    if (errEl) errEl.textContent = 'Konfirmasi password baru tidak cocok.';
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/me/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        oldPassword: oldPass,
+        newPassword: newPass
+      })
+    });
+    const res = await r.json();
+    if (r.ok) {
+      toast('Password akun berhasil diperbarui! 🔒');
+      if ($('#acc-oldpass')) $('#acc-oldpass').value = '';
+      if ($('#acc-newpass')) $('#acc-newpass').value = '';
+      if ($('#acc-confirmpass')) $('#acc-confirmpass').value = '';
+      if (errEl) errEl.textContent = '';
+    } else {
+      if (errEl) errEl.textContent = res.error || 'Gagal mengganti password.';
+      else toast(res.error || 'Gagal mengganti password.');
+    }
+  } catch (err) {
+    if (errEl) errEl.textContent = 'Error koneksi: ' + err.message;
+    else toast('Error: ' + err.message);
+  }
+}
+
+function togglePasswordVisibility(cb) {
+  const show = cb.checked;
+  ['acc-oldpass', 'acc-newpass', 'acc-confirmpass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.type = show ? 'text' : 'password';
+  });
+}
+
+/* Sub-View: Profil Akun & Sinkronisasi */
 function vAkun() {
+  const curRole = ROLES[CURRENT_ROLE] || ROLES.bendahara;
+  const user = ME || {
+    name: curRole.person || 'Administrator Lokal',
+    username: CURRENT_ROLE,
+    role: CURRENT_ROLE,
+    avatar: null
+  };
+  const roleInfo = ROLES[user.role] || curRole;
+
   return '<div class="stack">' +
-    backBar('Akun Saya &amp; Sinkronisasi') +
-    '<div class="card">' +
-      '<div class="lab">Masuk Sebagai</div>' +
-      '<div class="val">' + esc(ME ? ME.name : 'Tamu / Offline') + '</div>' +
-      '<div class="sub">Username: <b>@' + esc(ME ? ME.username : 'local') + '</b> · Peran: <b>' + (ME ? (ROLE_L[ME.role] || ME.role) : 'Super Admin (Lokal)') + '</b></div>' +
+    backBar('Profil &amp; Akun Saya') +
+    '<input type="file" id="f-avatar-upload" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="handleAvatarFile(event)">' +
+
+    /* Apple ID Profile Card */
+    '<div class="card" style="text-align:center;padding:24px 16px;background:var(--panel2);position:relative;overflow:hidden">' +
+      '<div style="display:inline-block;position:relative;margin-bottom:12px">' +
+        renderAvatar(user, 92, 'margin:0 auto;box-shadow:0 8px 24px rgba(0,0,0,0.18);border:3px solid var(--panel);') +
+        '<button class="ios-avatar-badge" onclick="triggerAvatarUpload()" title="Ganti Foto Profil" aria-label="Ganti Foto">' +
+          '📷' +
+        '</button>' +
+      '</div>' +
+      '<h2 style="font-size:20px;margin:0 0 4px;font-weight:800">' + esc(user.name) + '</h2>' +
+      '<div class="sub" style="margin-bottom:12px">' +
+        '<b>@' + esc(user.username) + '</b> · ' +
+        '<span class="pill ' + (roleInfo.badgeClass || 'ok') + '" style="font-size:11px;padding:2px 8px;vertical-align:middle">' +
+          (roleInfo.icon || '💼') + ' ' + esc(roleInfo.name) +
+        '</span>' +
+      '</div>' +
+      '<div class="row" style="justify-content:center;gap:8px;margin-top:6px">' +
+        '<button class="btn sm pri" onclick="triggerAvatarUpload()">📷 Pilih Foto Baru</button>' +
+        (user.avatar ? '<button class="btn sm" onclick="removeAvatarPhoto()" style="color:var(--bad)">Hapus Foto</button>' : '') +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:10px">Foto otomatis dipotong persegi &amp; dikompres jernih tanpa beban database.</div>' +
     '</div>' +
 
-    '<div class="card">' +
+    /* Edit Data Profil */
+    '<div class="card stack" style="gap:12px">' +
+      '<h3>Data Profil</h3>' +
+      fld('Nama Lengkap', '<input id="prof-name" value="' + esc(user.name) + '" placeholder="Nama dan gelar lengkap">') +
+      fld('Username Akun', '<input value="@' + esc(user.username) + '" disabled style="opacity:0.75;background:var(--panel2)">') +
+      fld('Peran Sistem', '<input value="' + esc(roleInfo.name) + ' (' + esc(roleInfo.desc || '') + ')' + '" disabled style="opacity:0.75;background:var(--panel2)">') +
+      '<button class="btn ok block" onclick="doSaveProfileName()">Simpan Nama Profil</button>' +
+    '</div>' +
+
+    /* Ganti Password */
+    '<div class="card stack" style="gap:12px">' +
+      '<div class="row" style="gap:8px;align-items:center">' +
+        '<span style="font-size:18px">🔒</span>' +
+        '<h3 style="margin:0">Keamanan &amp; Ganti Password</h3>' +
+      '</div>' +
+      '<p class="small muted" style="margin:0">Setiap pemegang akun riset dapat mengubah password secara mandiri demi keamanan data keuangan.</p>' +
+      '<div id="acc-pass-err" class="small" style="color:var(--bad);font-weight:700"></div>' +
+      fld('Password Saat Ini', '<input type="password" id="acc-oldpass" autocomplete="current-password" placeholder="Masukkan password lama">') +
+      fld('Password Baru', '<input type="password" id="acc-newpass" autocomplete="new-password" placeholder="Minimal 6 karakter">') +
+      fld('Konfirmasi Password Baru', '<input type="password" id="acc-confirmpass" autocomplete="new-password" placeholder="Ulangi password baru">') +
+      '<label class="row" style="cursor:pointer;font-size:13px;color:var(--muted)">' +
+        '<input type="checkbox" onchange="togglePasswordVisibility(this)" style="width:16px;height:16px;accent-color:var(--helm)">' +
+        '<span>Tampilkan karakter password</span>' +
+      '</label>' +
+      '<button class="btn pri block" onclick="doChangePassword()">Perbarui Password Akun</button>' +
+    '</div>' +
+
+    /* Status Server & Sesi */
+    '<div class="card stack" style="gap:10px">' +
+      '<h3>Status Sesi &amp; Server</h3>' +
       '<div class="row between">' +
-        '<span class="lab">Status Server</span>' +
+        '<span class="lab">Status Koneksi</span>' +
         '<span class="pill ' + (MODE === 'server' ? 'ok' : 'warning') + '">' +
           '<span class="dot"></span> ' + (MODE === 'server' ? 'Terhubung (Server VPS)' : 'Mode Lokal (Browser)') +
         '</span>' +
       '</div>' +
-      '<p class="small muted" style="margin:8px 0 0">Server fintax.zandev.id otomatis menyimpan perubahan data ke database SQLite pusat.</p>' +
+      '<div class="small muted">Database pusat tersimpan aman di server VPS (fintax.zandev.id).</div>' +
+      '<div class="row" style="gap:8px;margin-top:6px">' +
+        '<button class="btn block" style="flex:1" onclick="sheetSwitchAccount()">Ganti Akun Lain</button>' +
+        (ME ? '<button class="btn bad block" style="flex:1" onclick="doLogout()">Keluar (Logout)</button>' : '<button class="btn pri block" style="flex:1" onclick="sheetLogin()">Masuk Akun</button>') +
+      '</div>' +
     '</div>' +
-
-    (ME ? '<button class="btn bad block" onclick="doLogout()">Keluar dari Akun</button>' : '<button class="btn pri block" onclick="sheetLogin()">Masuk Akun Server</button>') +
   '</div>';
 }
 
@@ -4154,10 +4482,13 @@ function sheetLogin() {
         const res = await r.json();
         if (r.ok && res.user) {
           ME = res.user;
+          CURRENT_ROLE = ME.role;
           MODE = 'server';
           closeSheet();
           toast('Berhasil login sebagai ' + ME.name);
           loadUsers();
+          loadServerRoles();
+          renderHeader();
           render();
         } else {
           $('#sheet-e').textContent = res.error || 'Login gagal.';
@@ -4177,6 +4508,7 @@ async function doLogout() {
   ME = null;
   MODE = 'local';
   toast('Telah keluar');
+  renderHeader();
   render();
 }
 
@@ -4208,14 +4540,16 @@ function renderHeader() {
   if (!topEl) return;
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const r = ROLES[CURRENT_ROLE] || ROLES.bendahara;
+  const userObj = ME || { name: r.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
 
   topEl.innerHTML =
     '<button class="projbtn" onclick="go(null, \'proyek\')">' +
       '<b>' + esc(p.name) + '</b>' +
       '<span>' + esc(p.scheme || 'Riset Kemendikbudristek') + ' · ' + p.year + '</span>' +
     '</button>' +
-    '<button class="pill ' + r.badgeClass + '" onclick="sheetSwitchRole()" aria-label="Ganti Peran" title="Klik untuk ganti peran: Admin, Ketua, Bendahara">' +
-      '<span>' + r.icon + '</span> <b>' + r.tag + '</b>' +
+    '<button class="pill ' + r.badgeClass + '" onclick="sheetSwitchRole()" aria-label="Ganti Peran" title="Klik untuk menu akun & ganti peran" style="padding:3px 10px 3px 4px;gap:6px">' +
+      renderAvatar(userObj, 22) +
+      '<b>' + r.tag + '</b>' +
     '</button>' +
     '<button class="iconbtn" onclick="toggleTheme()" aria-label="Ganti Tema" style="min-width:36px;min-height:36px">' +
       svg(isDark ? 'sun' : 'moon') +
@@ -4224,24 +4558,28 @@ function renderHeader() {
 
 function sheetSwitchRole() {
   const cur = getRole(CURRENT_ROLE);
+  const userObj = ME || { name: cur.person || cur.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
   sheet('Akun & Peran Aktif',
     '<div class="stack">' +
       '<div class="card" style="background:var(--panel2)">' +
         '<div class="lab">Akun Terautentikasi</div>' +
-        '<div class="row" style="margin-top:6px;gap:10px">' +
-          '<span style="font-size:28px">' + (cur.icon || '💼') + '</span>' +
-          '<div>' +
-            '<b style="font-size:16.5px">' + esc(ME?.name || cur.name) + '</b>' +
-            '<div class="small muted">@' + esc(ME?.username || 'user') + ' · <span class="pill ' + (cur.badgeClass || 'ok') + '" style="font-size:10.5px;padding:1px 7px">' + esc(cur.name) + '</span></div>' +
+        '<div class="row" style="margin-top:8px;gap:12px;align-items:center">' +
+          renderAvatar(userObj, 48) +
+          '<div style="flex:1;min-width:0">' +
+            '<b style="font-size:16.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(userObj.name) + '</b>' +
+            '<div class="small muted">@' + esc(userObj.username || 'user') + ' · <span class="pill ' + (cur.badgeClass || 'ok') + '" style="font-size:10.5px;padding:1px 7px">' + esc(cur.name) + '</span></div>' +
           '</div>' +
         '</div>' +
-        '<div class="small muted" style="margin-top:8px">' + esc(cur.desc) + '</div>' +
+        '<div class="small muted" style="margin-top:10px">' + esc(cur.desc) + '</div>' +
+        '<div class="row" style="gap:8px;margin-top:12px">' +
+          '<button class="btn sm pri block" style="flex:1" onclick="closeSheet();go(null, \'akun\')">⚙️ Pengaturan Profil &amp; Password</button>' +
+        '</div>' +
       '</div>' +
 
       '<div class="card stack" style="gap:8px">' +
         '<h3>Ganti Peran / Akun Lain</h3>' +
         '<p class="small muted" style="margin:0">Untuk keamanan dan integritas keuangan riset, pergantian akun wajib memasukkan password yang valid.</p>' +
-        '<button class="btn pri block" onclick="sheetSwitchAccount()">Ganti Akun (Login)</button>' +
+        '<button class="btn block" onclick="sheetSwitchAccount()">Ganti Akun (Login)</button>' +
       '</div>' +
 
       (canSuperAdmin() ?
