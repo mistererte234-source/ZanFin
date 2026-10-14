@@ -297,11 +297,48 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    if (pathname === '/api/users' && req.method === 'GET') {
+    if (pathname === '/api/users') {
       const user = getSessionUser(req);
-      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Forbidden' });
-      const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users').all();
-      return sendJson(res, 200, { users });
+      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa mengelola akun' });
+      
+      if (req.method === 'GET') {
+        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        return sendJson(res, 200, { users });
+      }
+
+      if (req.method === 'POST') {
+        const body = JSON.parse(await readBody(req));
+        const { id, username, name, role, pass, active } = body;
+        if (id) {
+          if (pass && pass.trim()) {
+            const hash = hashPass(pass.trim());
+            db.prepare('UPDATE users SET name = ?, role = ?, pass = ?, active = ? WHERE id = ?').run(
+              name || username, role || 'peneliti', hash, active !== false ? 1 : 0, id
+            );
+          } else {
+            db.prepare('UPDATE users SET name = ?, role = ?, active = ? WHERE id = ?').run(
+              name || username, role || 'peneliti', active !== false ? 1 : 0, id
+            );
+          }
+        } else {
+          if (!username || !pass) {
+            return sendJson(res, 400, { error: 'Username dan password wajib diisi' });
+          }
+          const hash = hashPass(pass.trim());
+          try {
+            db.prepare('INSERT INTO users (username, name, role, pass, active, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+              username.toLowerCase().trim(), name || username, role || 'peneliti', hash, active !== false ? 1 : 0, Date.now()
+            );
+          } catch (e) {
+            if (e.message && e.message.includes('UNIQUE')) {
+              return sendJson(res, 400, { error: 'Username sudah digunakan' });
+            }
+            throw e;
+          }
+        }
+        const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
+        return sendJson(res, 200, { ok: true, users });
+      }
     }
 
     return sendJson(res, 404, { error: 'Not found' });
