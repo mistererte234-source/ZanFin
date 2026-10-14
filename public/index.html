@@ -2574,6 +2574,9 @@ function toggleTheme() {
 }
 
 async function init() {
+  view = 'nadi';
+  sub = null;
+
   const savedTheme = localStorage.getItem(THEME_KEY);
   if (savedTheme) {
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -2591,6 +2594,10 @@ async function init() {
     }
   } catch (e) {
     MODE = 'local';
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => reg.update()).catch(() => {});
   }
 
   render();
