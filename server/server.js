@@ -102,6 +102,36 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
 `);
 
+// Migrate users table if it has restrictive CHECK constraint
+try {
+  const usersSqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+  const usersSql = usersSqlRow ? usersSqlRow.sql : '';
+  if (usersSql && usersSql.includes("CHECK(role IN")) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      BEGIN TRANSACTION;
+      CREATE TABLE users_new(
+        id INTEGER PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        pass TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        perm_rev INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+      INSERT INTO users_new SELECT id, username, name, role, pass, active, perm_rev, created_at FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+      COMMIT;
+      PRAGMA foreign_keys=ON;
+    `);
+    console.log('[ZanFin] Migrasi schema users berhasil: batas CHECK constraint role telah dihapus.');
+  }
+} catch (e) {
+  console.error('[ZanFin] Error migrasi schema users:', e.message);
+}
+
 function nextRev() {
   db.exec("UPDATE counter SET v = v + 1 WHERE k = 'rev'");
   const row = db.prepare("SELECT v FROM counter WHERE k = 'rev'").get();
@@ -121,16 +151,17 @@ function verifyPass(pwd, stored) {
   return crypto.timingSafeEqual(Buffer.from(key, 'hex'), buf);
 }
 
-// Ensure default role accounts exist (Superadmin, Ketua, Bendahara, Peneliti)
+// Ensure default role accounts exist (Superadmin, Admin Operasional, Ketua, Bendahara, Peneliti)
 const defaultSeedUsers = [
-  { username: 'admin', name: 'Astro Administrator', role: 'superadmin', pass: 'admin123' },
+  { username: 'superadmin', name: 'Zandev Superadmin (Master)', role: 'superadmin', pass: 'superadmin123' },
+  { username: 'admin', name: 'Administrator Operasional', role: 'admin', pass: 'admin123' },
   { username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', pass: 'ketua123' },
   { username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', pass: 'bendahara123' },
   { username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', pass: 'peneliti123' }
 ];
 
 for (const u of defaultSeedUsers) {
-  const existing = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(u.username);
+  const existing = db.prepare('SELECT id, role FROM users WHERE username = ? COLLATE NOCASE').get(u.username);
   if (!existing) {
     const hash = hashPass(u.pass);
     db.prepare(`
@@ -138,12 +169,16 @@ for (const u of defaultSeedUsers) {
       VALUES (?, ?, ?, ?, 1, ?)
     `).run(u.username, u.name, u.role, hash, Date.now());
     console.log(`[ZanFin] Akun default dibuat: ${u.username} (${u.role}), pass: ${u.pass}`);
+  } else if (u.username === 'admin' && existing.role === 'superadmin') {
+    db.prepare("UPDATE users SET role = 'admin', name = 'Administrator Operasional' WHERE id = ?").run(existing.id);
+    console.log(`[ZanFin] Akun admin dimigrasikan ke role 'admin' (Administrator Operasional)`);
   }
 }
 
 // Seed default system roles
 const defaultRoles = [
-  { id: 'superadmin', name: 'Super Admin', tag: 'Admin', icon: '👑', badge_class: 'bad', description: 'Semua proyek, kelola semua akun & pengaturan sistem.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true }), system: 1 },
+  { id: 'superadmin', name: 'Super Admin', tag: 'Master', icon: '👑', badge_class: 'bad', description: 'Semua wewenang: pantau catatan mata-mata, backup database & atur sistem.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true, audit: true, backup: true }), system: 1 },
+  { id: 'admin', name: 'Admin Operasional', tag: 'Admin', icon: '🛡️', badge_class: 'bad', description: 'Input, edit belanja, kelola tim & ekspor, tanpa akses catatan mata-mata.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true, audit: false, backup: false }), system: 1 },
   { id: 'ketua', name: 'Ketua Peneliti', tag: 'Ketua', icon: '🎓', badge_class: 'info', description: 'Pengesahan belanja, tanda tangan kuitansi LPJ & serapan anggaran.', perms: JSON.stringify({ kas_in: true, kas_out: false, honor: false, approve: true, tax: true, users: false, spj: true, export: true }), system: 1 },
   { id: 'bendahara', name: 'Bendahara Proyek', tag: 'Bendahara', icon: '💼', badge_class: 'ok', description: 'Input kas harian, penggajian honor, pemotongan pajak Coretax & SPJ.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: false, tax: true, users: false, spj: true, export: true }), system: 1 },
   { id: 'peneliti', name: 'Anggota Peneliti', tag: 'Peneliti', icon: '🔬', badge_class: 'warning', description: 'Pantau progres pelaksanaan riset dan serapan anggaran.', perms: JSON.stringify({ kas_in: false, kas_out: false, honor: false, approve: false, tax: false, users: false, spj: true, export: true }), system: 0 },
@@ -557,7 +592,9 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/users') {
       const user = getSessionUser(req);
-      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa mengelola akun' });
+      if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+        return sendJson(res, 403, { error: 'Hanya Administrator yang bisa mengelola akun' });
+      }
       
       if (req.method === 'GET') {
         const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
@@ -567,6 +604,20 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST') {
         const body = JSON.parse(await readBody(req));
         const { id, username, name, role, pass, active } = body;
+
+        // Security restriction for operational admin:
+        if (user.role === 'admin') {
+          if (role === 'superadmin') {
+            return sendJson(res, 403, { error: 'Admin Operasional tidak dapat memberikan wewenang Super Admin' });
+          }
+          if (id) {
+            const target = db.prepare('SELECT role FROM users WHERE id = ?').get(id);
+            if (target && target.role === 'superadmin') {
+              return sendJson(res, 403, { error: 'Admin Operasional tidak dapat mengubah akun Super Admin' });
+            }
+          }
+        }
+
         if (id) {
           if (pass && pass.trim()) {
             const hash = hashPass(pass.trim());
@@ -601,16 +652,20 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (req.method === 'DELETE') {
-        const user = getSessionUser(req);
-        if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa menghapus akun' });
         const body = JSON.parse(await readBody(req));
         const { id } = body;
         if (!id) return sendJson(res, 400, { error: 'ID user wajib diisi' });
         if (Number(id) === Number(user.id)) return sendJson(res, 400, { error: 'Tidak dapat menghapus akun Anda sendiri yang sedang aktif' });
 
         const target = db.prepare('SELECT username, name, role FROM users WHERE id = ?').get(id);
+        if (!target) return sendJson(res, 404, { error: 'Akun tidak ditemukan' });
+
+        if (user.role === 'admin' && (target.role === 'superadmin' || target.role === 'admin')) {
+          return sendJson(res, 403, { error: 'Admin Operasional tidak dapat menghapus akun Super Admin atau sesama Admin' });
+        }
+
         db.prepare('DELETE FROM users WHERE id = ?').run(id);
-        recordAudit(req, user, 'USER_DELETE', 'tim', `Menghapus akun pengguna "${target ? target.name + ' (@' + target.username + ')' : 'ID ' + id}"`);
+        recordAudit(req, user, 'USER_DELETE', 'tim', `Menghapus akun pengguna "${target.name} (@${target.username})"`);
         const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
       }

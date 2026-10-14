@@ -805,12 +805,22 @@ const ROLES = {
   superadmin: {
     id: 'superadmin',
     name: 'Super Admin',
-    tag: 'Admin',
+    tag: 'Master',
     icon: '👑',
     badgeClass: 'bad',
+    user: 'superadmin',
+    person: 'Zandev Superadmin (Master)',
+    desc: 'Semua wewenang: pantau catatan mata-mata, backup database & kontrol sistem.'
+  },
+  admin: {
+    id: 'admin',
+    name: 'Admin Operasional',
+    tag: 'Admin',
+    icon: '🛡️',
+    badgeClass: 'bad',
     user: 'admin',
-    person: 'Astro Administrator',
-    desc: 'Semua proyek, kelola semua akun & pengaturan sistem.'
+    person: 'Administrator Operasional',
+    desc: 'Input & edit belanja, kelola tim, approve, tanpa akses catatan mata-mata.'
   },
   ketua: {
     id: 'ketua',
@@ -846,6 +856,7 @@ const ROLES = {
 
 const ROLE_L = {
   superadmin: 'Super Admin',
+  admin: 'Admin Operasional',
   ketua: 'Ketua Peneliti',
   bendahara: 'Bendahara Proyek',
   peneliti: 'Anggota Peneliti',
@@ -863,9 +874,10 @@ let BACKUP_STATUS = null;
 let SELECTED_RESTORE_FILE = null;
 
 /* Role-Based Access Control (RBAC) helpers */
-function canAdmin() { return ME && ME.role === 'superadmin'; }
-function canApprove() { return ME && (ME.role === 'ketua' || ME.role === 'superadmin'); }
-function canSpend() { return ME && (ME.role === 'bendahara' || ME.role === 'superadmin'); }
+function canSuperAdmin() { return ME && ME.role === 'superadmin'; }
+function canAdmin() { return ME && (ME.role === 'superadmin' || ME.role === 'admin'); }
+function canApprove() { return ME && (ME.role === 'ketua' || ME.role === 'superadmin' || ME.role === 'admin'); }
+function canSpend() { return ME && (ME.role === 'bendahara' || ME.role === 'superadmin' || ME.role === 'admin'); }
 
 function captureGps() {
   if (!navigator.geolocation) return Promise.resolve(null);
@@ -886,7 +898,7 @@ function captureGps() {
 }
 
 async function checkBackupStatus() {
-  if (!canAdmin()) return;
+  if (!canSuperAdmin()) return;
   try {
     const r = await fetch('/api/backup/status');
     if (r.ok) {
@@ -947,13 +959,14 @@ const CAT_OUT = {
   ops: 'FGD, Konsumsi & Operasional Riset'
 };
 
-/* Seed data */
-function defaultSeed() {
+/* Authentic Research Dataset from docs/RAB Pajak Realisasi Bu Nadhiroh - 17 Agst 2026 2.xlsx */
+function getRealResearchSeed() {
   const pid = 'p_resiliensi_2026';
   return {
     activeId: pid,
     roles: [
-      { id: 'superadmin', name: 'Super Admin', tag: 'Admin', icon: '👑', badgeClass: 'bad', desc: 'Semua proyek, kelola semua akun & pengaturan sistem.', perms: { kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true }, system: true },
+      { id: 'superadmin', name: 'Super Admin', tag: 'Master', icon: '👑', badgeClass: 'bad', desc: 'Semua wewenang: pantau catatan mata-mata, backup database & atur sistem.', perms: { kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true, audit: true, backup: true }, system: true },
+      { id: 'admin', name: 'Admin Operasional', tag: 'Admin', icon: '🛡️', badgeClass: 'bad', desc: 'Input, edit belanja, kelola tim & ekspor, tanpa akses catatan mata-mata.', perms: { kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true, audit: false, backup: false }, system: true },
       { id: 'ketua', name: 'Ketua Peneliti', tag: 'Ketua', icon: '🎓', badgeClass: 'info', desc: 'Pengesahan belanja, tanda tangan kuitansi LPJ & serapan anggaran.', perms: { kas_in: true, kas_out: false, honor: false, approve: true, tax: true, users: false, spj: true, export: true }, system: true },
       { id: 'bendahara', name: 'Bendahara Proyek', tag: 'Bendahara', icon: '💼', badgeClass: 'ok', desc: 'Input kas harian, penggajian honor, pemotongan pajak Coretax & SPJ.', perms: { kas_in: true, kas_out: true, honor: true, approve: false, tax: true, users: false, spj: true, export: true }, system: true },
       { id: 'peneliti', name: 'Anggota Peneliti', tag: 'Peneliti', icon: '🔬', badgeClass: 'warning', desc: 'Pantau progres pelaksanaan riset dan serapan anggaran.', perms: { kas_in: false, kas_out: false, honor: false, approve: false, tax: false, users: false, spj: true, export: true }, system: false },
@@ -964,6 +977,7 @@ function defaultSeed() {
         id: pid,
         name: 'Riset Resiliensi Pangan & Gizi (Gresik & Batu)',
         leader: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+        institution: 'Fakultas Kesehatan Masyarakat Universitas Airlangga',
         scheme: 'Penelitian Terapan Unggulan PT (Kemendikbudristek)',
         year: 2026,
         pagu: 120000000,
@@ -978,7 +992,7 @@ function defaultSeed() {
         id: 'tx_in_1',
         pid: pid,
         date: '2026-07-15',
-        ts: Date.now() - 3600000 * 48,
+        ts: 1752541200000,
         dir: 'in',
         cat: 'termin1',
         amount: 84000000,
@@ -987,44 +1001,214 @@ function defaultSeed() {
         tax_pph22: 0,
         tax_pph23: 0,
         tax_ppn: 0,
-        note: 'Pencairan Dana Hibah Riset Tahap 1 (70%) DRTPM',
+        note: 'Pencairan Dana Hibah Riset Tahap 1 (70%) DRTPM Kemendikbudristek',
         ref: 'SP2D-DRTPM-7718/2026',
         spj_ok: true,
         void: false
       },
       {
-        id: 'tx_out_1',
+        id: 'tx_sewa_1',
         pid: pid,
-        date: '2026-07-18',
-        ts: Date.now() - 3600000 * 36,
+        date: '2026-08-01',
+        ts: 1754010000000,
         dir: 'out',
-        cat: 'bahan',
-        amount: 8500000,
-        gross: 8500000,
+        cat: 'ops',
+        amount: 5400000,
+        gross: 6000000,
         tax_pph21: 0,
         tax_pph22: 0,
         tax_pph23: 0,
+        tax_pph42: 600000,
         tax_ppn: 0,
-        note: 'Pembelian reagen pengujian sampel gizi mikro & tabung reaksi lab',
-        ref: 'KWT-LAB-019',
+        note: 'Pembayaran sewa rumah posko riset bulan Agustus 2026 (PPh 4(2) Final 10%)',
+        ref: 'KWT-SEWA-001',
+        vendor: 'Pemilik Rumah Posko Lapangan',
         spj_ok: true,
         void: false
       },
       {
-        id: 'tx_out_2',
+        id: 'tx_mobil_1',
         pid: pid,
-        date: '2026-07-22',
-        ts: Date.now() - 3600000 * 24,
+        date: '2026-08-01',
+        ts: 1754013600000,
         dir: 'out',
         cat: 'perjalanan',
-        amount: 6200000,
-        gross: 6200000,
+        amount: 14406000,
+        gross: 14700000,
+        tax_pph21: 0,
+        tax_pph22: 0,
+        tax_pph23: 294000,
+        tax_ppn: 0,
+        note: 'Pembayaran sewa mobil operasional survei Agustus & September (PPh 23 Sewa Kendaraan 2%)',
+        ref: 'KWT-MOBIL-001',
+        vendor: 'Armada Rental Kendaraan',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_motor_1',
+        pid: pid,
+        date: '2026-08-01',
+        ts: 1754017200000,
+        dir: 'out',
+        cat: 'perjalanan',
+        amount: 1543500,
+        gross: 1575000,
+        tax_pph21: 0,
+        tax_pph22: 0,
+        tax_pph23: 31500,
+        tax_ppn: 0,
+        note: 'Pembayaran sewa motor Mio lapangan bulan Agustus 2026 (PPh 23 Sewa 2%)',
+        ref: 'KWT-MTR-001',
+        vendor: 'Rental Motor Lapangan',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_kons_1',
+        pid: pid,
+        date: '2026-08-21',
+        ts: 1755741600000,
+        dir: 'out',
+        cat: 'ops',
+        amount: 1600000,
+        gross: 1600000,
         tax_pph21: 0,
         tax_pph22: 0,
         tax_pph23: 0,
         tax_ppn: 0,
-        note: 'BBM & sewa armada survei lapangan posyandu Gresik & Batu',
-        ref: 'KWT-TRP-004',
+        note: 'Konsumsi FGD Uji Validitas Instrumen Kab. Gresik (Makan Rapat 32 porsi)',
+        ref: 'KWT-KONS-015',
+        vendor: 'Siti Nurhaeda (NIK 6402045402810002)',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_kons_2',
+        pid: pid,
+        date: '2026-08-21',
+        ts: 1755745200000,
+        dir: 'out',
+        cat: 'ops',
+        amount: 640000,
+        gross: 640000,
+        tax_pph21: 0,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Konsumsi FGD Uji Validitas Instrumen Kab. Gresik (Snack Rapat 32 porsi)',
+        ref: 'KWT-KONS-016',
+        vendor: 'Siti Nurhaeda (NIK 6402045402810002)',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_trp_1',
+        pid: pid,
+        date: '2026-08-23',
+        ts: 1755914400000,
+        dir: 'out',
+        cat: 'perjalanan',
+        amount: 750000,
+        gross: 750000,
+        tax_pph21: 0,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Survey Pasar Kab. Gresik - Transport Operasional Lapangan (PP)',
+        ref: 'KWT-TRP-012',
+        vendor: 'Mukti Wibowo (NPWP 71.661.226.2-643.000)',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_trp_2',
+        pid: pid,
+        date: '2026-08-25',
+        ts: 1756087200000,
+        dir: 'out',
+        cat: 'perjalanan',
+        amount: 980000,
+        gross: 980000,
+        tax_pph21: 0,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Perizinan Pengambilan Data & Survey Pasar Kab. Batu - Transport (PP)',
+        ref: 'KWT-TRP-014',
+        vendor: 'Mukti Wibowo (NPWP 71.661.226.2-643.000)',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_1',
+        pid: pid,
+        date: '2026-08-21',
+        ts: 1755748800000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 855000,
+        gross: 900000,
+        tax_pph21: 45000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'FGD Uji Validitas Instrumen Kab. Gresik - HR Narasumber 1 (Ahmad Fathony M.)',
+        ref: 'KWT-HR-017',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_2',
+        pid: pid,
+        date: '2026-08-26',
+        ts: 1756173600000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 855000,
+        gross: 900000,
+        tax_pph21: 45000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'FGD Uji Validitas Instrumen Kab. Batu - HR Narasumber 1 (Lestari Aji, S.Pi)',
+        ref: 'KWT-HR-023',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_3',
+        pid: pid,
+        date: '2026-08-28',
+        ts: 1756346400000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 1463000,
+        gross: 1540000,
+        tax_pph21: 77000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Honor Pengolah Data Analisis Gizi Mikro & Tabulasi (Allisa Nadhira, S.Gz.)',
+        ref: 'KWT-HR-055',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_4',
+        pid: pid,
+        date: '2026-08-30',
+        ts: 1756519200000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 1216000,
+        gross: 1280000,
+        tax_pph21: 64000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Honor Petugas Survei Lapangan Rumah Tangga (160 responden @ Rp 8.000)',
+        ref: 'KWT-HR-056',
         spj_ok: true,
         void: false
       }
@@ -1061,27 +1245,27 @@ function defaultSeed() {
       {
         id: 'w_3',
         pid: pid,
-        name: 'Siti Nurhaliza, S.Gz',
-        role: 'Asisten Peneliti',
-        nik: '3578035508960003',
-        npwp: '09.345.678.9-604.000',
+        name: 'Allisa Nadhira, S.Gz.',
+        role: 'Pengolah Data',
+        nik: '3516134111010000',
+        npwp: '35.161.341.1-101.000',
         golongan: 'non_pns_npwp',
-        tarif: 1750000,
-        unit: 'bulan',
-        bank: 'Bank Mandiri 140001234567',
+        tarif: 1540000,
+        unit: 'kegiatan',
+        bank: 'Bank Mandiri 140001928374',
         hp: '081567890123',
         active: true
       },
       {
         id: 'w_4',
         pid: pid,
-        name: 'Budi Santoso, S.Kom',
-        role: 'Data Analyst / Asisten IT',
+        name: 'Ahmad Fathony Maulidy, S.T., M.T.',
+        role: 'Narasumber FGD Validitas Gresik',
         nik: '3578041003940004',
-        npwp: '10.456.789.0-604.000',
+        npwp: '89.696.748.6-612.000',
         golongan: 'non_pns_npwp',
-        tarif: 1500000,
-        unit: 'bulan',
+        tarif: 900000,
+        unit: 'OJ',
         bank: 'Bank BCA 8290123456',
         hp: '081678901234',
         active: true
@@ -1089,43 +1273,169 @@ function defaultSeed() {
       {
         id: 'w_5',
         pid: pid,
-        name: 'Dewi Anggraini',
-        role: 'Enumerator Survei Gresik',
-        nik: '3525016509990005',
-        npwp: '',
-        golongan: 'non_pns_non',
-        tarif: 350000,
-        unit: 'hari',
-        bank: 'Bank BRI 001201098765501',
+        name: 'Lestari Aji, S.Pi, M.A.Gr',
+        role: 'Narasumber FGD Validitas Batu',
+        nik: '3579011201980006',
+        npwp: '49.991.641.9-623.000',
+        golongan: 'non_pns_npwp',
+        tarif: 900000,
+        unit: 'OJ',
+        bank: 'Bank BNI 0112233445',
         hp: '081789012345',
         active: true
       },
       {
         id: 'w_6',
         pid: pid,
-        name: 'Rizky Pratama',
-        role: 'Enumerator Survei Batu',
-        nik: '3579011201980006',
-        npwp: '',
-        golongan: 'non_pns_non',
-        tarif: 350000,
-        unit: 'hari',
-        bank: 'Bank BRI 001201098765502',
+        name: 'Iman Maulana, S.T.',
+        role: 'Narasumber Workshop Scorecard UNDRR',
+        nik: '3578010101550007',
+        npwp: '92.018.086.6-614.000',
+        golongan: 'non_pns_npwp',
+        tarif: 900000,
+        unit: 'OJ',
+        bank: 'Bank Mandiri 141002345678',
         hp: '081890123456',
         active: true
       },
       {
         id: 'w_7',
         pid: pid,
-        name: 'Prof. Dr. Soedarmono, Sp.GK',
-        role: 'Narasumber Pakar Gizi Klinis',
-        nik: '3578010101550007',
-        npwp: '01.234.567.8-604.000',
-        golongan: 'pns_iv',
-        tarif: 1800000,
-        unit: 'kegiatan',
-        bank: 'Bank BNI 0112233445',
+        name: 'Mukti Wibowo',
+        role: 'Penyedia Transport & Armada Survei',
+        nik: '3578051208880008',
+        npwp: '71.661.226.2-643.000',
+        golongan: 'non_pns_npwp',
+        tarif: 750000,
+        unit: 'hari',
+        bank: 'Bank BRI 001201098765501',
         hp: '081901234567',
+        active: true
+      },
+      {
+        id: 'w_8',
+        pid: pid,
+        name: 'Siti Nurhaeda',
+        role: 'Penyedia Konsumsi Rapat & Edukasi Gizi',
+        nik: '6402045402810002',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 50000,
+        unit: 'porsi',
+        bank: 'Bank BRI 001201088765509',
+        hp: '081234567899',
+        active: true
+      },
+      {
+        id: 'w_9',
+        pid: pid,
+        name: 'Ratu Dien Prima Fermeza., S.Gz.',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3578195311030009',
+        npwp: '62.527.930.2-606.000',
+        golongan: 'non_pns_npwp',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BNI 0981234561',
+        hp: '082134567801',
+        active: true
+      },
+      {
+        id: 'w_10',
+        pid: pid,
+        name: 'Kayla Auraline Erlawan, S.Gz.',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3578195311030001',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BCA 8290123402',
+        hp: '082134567802',
+        active: true
+      },
+      {
+        id: 'w_11',
+        pid: pid,
+        name: 'Nafiisah Zana Dzakiyyah, S.Gz.',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3578064312030004',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank Mandiri 140001234503',
+        hp: '082134567803',
+        active: true
+      },
+      {
+        id: 'w_12',
+        pid: pid,
+        name: 'Salma Violita Pradana, S.Gz',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3504116603030002',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BRI 00120109876504',
+        hp: '082134567804',
+        active: true
+      },
+      {
+        id: 'w_13',
+        pid: pid,
+        name: 'Melanie Putri Anggraini, S.Gz',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3517036002040001',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BNI 0981234505',
+        hp: '082134567805',
+        active: true
+      },
+      {
+        id: 'w_14',
+        pid: pid,
+        name: 'Maulidina Maiyarani Amroe, S.Gz',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3578085205040002',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BCA 8290123406',
+        hp: '082134567806',
+        active: true
+      },
+      {
+        id: 'w_15',
+        pid: pid,
+        name: 'Layyina Azka Nabila, S.Gz.',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3515164902040003',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank Mandiri 140001234507',
+        hp: '082134567807',
+        active: true
+      },
+      {
+        id: 'w_16',
+        pid: pid,
+        name: 'Wichdah Layn Al’aqilah, S.Gz.',
+        role: 'Petugas Survei RT Gresik & Batu',
+        nik: '3514115709020002',
+        npwp: '',
+        golongan: 'non_pns_non',
+        tarif: 8000,
+        unit: 'responden',
+        bank: 'Bank BRI 00120109876508',
+        hp: '082134567808',
         active: true
       }
     ],
@@ -1133,31 +1443,61 @@ function defaultSeed() {
       {
         id: 'pay_1',
         pid: pid,
-        wid: 'w_3',
-        date: '2026-07-25',
-        ts: Date.now() - 3600000 * 12,
-        period: 'Bulan Juli 2026 (Tahap 1)',
-        gross: 1750000,
-        tax_rate: 0.025,
-        tax_amt: 43750,
-        netto: 1706250,
-        ref: 'KWT-HNR-001',
-        note: 'Honorarium Asisten Peneliti analisis gizi mikro',
+        wid: 'w_4',
+        date: '2026-08-21',
+        ts: 1755748800000,
+        period: 'FGD Uji Validitas Gresik (Agustus 2026)',
+        gross: 900000,
+        tax_rate: 0.05,
+        tax_amt: 45000,
+        netto: 855000,
+        ref: 'KWT-HR-017',
+        note: 'Honorarium Narasumber 1 FGD Validitas Gresik (Ahmad Fathony M.)',
         paid: true
       },
       {
         id: 'pay_2',
         pid: pid,
-        wid: 'w_4',
-        date: '2026-07-25',
-        ts: Date.now() - 3600000 * 12,
-        period: 'Bulan Juli 2026 (Tahap 1)',
-        gross: 1500000,
-        tax_rate: 0.025,
-        tax_amt: 37500,
-        netto: 1462500,
-        ref: 'KWT-HNR-002',
-        note: 'Honorarium Asisten IT data cleaning & tabulasi',
+        wid: 'w_5',
+        date: '2026-08-26',
+        ts: 1756173600000,
+        period: 'FGD Uji Validitas Batu (Agustus 2026)',
+        gross: 900000,
+        tax_rate: 0.05,
+        tax_amt: 45000,
+        netto: 855000,
+        ref: 'KWT-HR-023',
+        note: 'Honorarium Narasumber 1 FGD Validitas Batu (Lestari Aji, S.Pi)',
+        paid: true
+      },
+      {
+        id: 'pay_3',
+        pid: pid,
+        wid: 'w_3',
+        date: '2026-08-28',
+        ts: 1756346400000,
+        period: 'Tahap 1 Analisis Data (Agustus 2026)',
+        gross: 1540000,
+        tax_rate: 0.05,
+        tax_amt: 77000,
+        netto: 1463000,
+        ref: 'KWT-HR-055',
+        note: 'Honor Pengolah Data Analisis Gizi Mikro & Tabulasi',
+        paid: true
+      },
+      {
+        id: 'pay_4',
+        pid: pid,
+        wid: 'w_9',
+        date: '2026-08-30',
+        ts: 1756519200000,
+        period: 'Survei Rumah Tangga Lapangan (Agustus 2026)',
+        gross: 1280000,
+        tax_rate: 0.05,
+        tax_amt: 64000,
+        netto: 1216000,
+        ref: 'KWT-HR-056',
+        note: 'Honor Petugas Survei Lapangan 160 responden RT',
         paid: true
       }
     ],
@@ -1171,6 +1511,200 @@ function defaultSeed() {
       laporan_kemajuan: false
     }
   };
+}
+
+/* Blank clean slate seed for new research team handover */
+function getCleanSlateSeed(keepPersonnel = false) {
+  const currentP = P() || {
+    id: 'p_resiliensi_2026',
+    name: 'Riset Resiliensi Pangan & Gizi (Gresik & Batu)',
+    leader: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+    institution: 'Fakultas Kesehatan Masyarakat Universitas Airlangga',
+    scheme: 'Penelitian Terapan Unggulan PT (Kemendikbudristek)',
+    year: 2026,
+    pagu: 120000000,
+    saldo: 0,
+    bank: 'Bank BNI Kantor Cabang Graha Unair',
+    acc: '0987654321',
+    holder: 'Dr. Ir. Hj. Nadhiroh, M.Kes'
+  };
+
+  const currentRoles = S?.roles && S.roles.length ? S.roles : getRealResearchSeed().roles;
+
+  let keptWorkers = [];
+  if (keepPersonnel && S?.workers?.length) {
+    keptWorkers = JSON.parse(JSON.stringify(S.workers));
+  } else {
+    keptWorkers = [
+      {
+        id: 'w_1',
+        pid: currentP.id,
+        name: currentP.leader || 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+        role: 'Ketua Peneliti',
+        nik: '',
+        npwp: '',
+        golongan: 'pns_iv',
+        tarif: 0,
+        unit: 'bulan',
+        bank: '',
+        hp: '',
+        active: true
+      }
+    ];
+  }
+
+  return {
+    activeId: currentP.id,
+    roles: currentRoles,
+    projects: [
+      {
+        ...currentP,
+        saldo: 0
+      }
+    ],
+    txns: [],
+    workers: keptWorkers,
+    payrolls: [],
+    spjChecklist: {
+      kontrak: false,
+      kuitansi: false,
+      sk_tim: false,
+      absensi_fgd: false,
+      transfer_honor: false,
+      foto_lapangan: false,
+      laporan_kemajuan: false
+    }
+  };
+}
+
+/* Seed data defaults to authentic research dataset */
+function defaultSeed() {
+  return getRealResearchSeed();
+}
+
+/* Dummy Data Cleaner & Authentic Excel Loader Actions */
+function sheetManageDummyData() {
+  const txCount = S?.txns?.length || 0;
+  const payCount = S?.payrolls?.length || 0;
+  const wCount = S?.workers?.length || 0;
+
+  sheet('Manajemen Data &amp; Reset Dummy',
+    '<div class="stack">' +
+      '<div class="card" style="background:var(--panel2);border-left:4px solid var(--helm);padding:14px">' +
+        '<div class="lab">Status Data Kas Saat Ini</div>' +
+        '<div class="flow" style="margin-top:6px">' +
+          '<div>Transaksi Kas<b>' + txCount + ' catatan</b></div>' +
+          '<div>Slip Honorarium<b>' + payCount + ' slip</b></div>' +
+          '<div>Anggota / Personel<b>' + wCount + ' orang</b></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card stack" style="gap:10px;border:1.5px solid rgba(239,68,68,0.3)">' +
+        '<div class="row" style="gap:8px;align-items:center">' +
+          '<span style="font-size:22px">🧹</span>' +
+          '<div>' +
+            '<b style="color:var(--bad)">Kosongkan Data Dummy (Clean Slate)</b>' +
+            '<div class="tiny muted">Gunakan ini jika ingin menyerahkan aplikasi ke tim peneliti dengan buku kas yang 100% bersih dan kosong.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="stack" style="gap:8px;margin-top:4px">' +
+          '<button class="btn bad block" onclick="confirmClearData(true)">🧹 Kosongkan Transaksi Saja (Pertahankan Tim)</button>' +
+          '<button class="btn block" style="color:var(--bad);border-color:rgba(239,68,68,0.35)" onclick="confirmClearData(false)">⚠️ Bersihkan Total (Hapus Transaksi &amp; Reset Tim)</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card stack" style="gap:10px;border:1.5px solid rgba(16,185,129,0.35)">' +
+        '<div class="row" style="gap:8px;align-items:center">' +
+          '<span style="font-size:22px">📥</span>' +
+          '<div>' +
+            '<b style="color:var(--ok)">Muat Data Riil Riset (RAB Excel Bu Nadhiroh)</b>' +
+            '<div class="tiny muted">Memuat 12 transaksi riil, termin hibah 70%, sewa posko rumah, sewa mobil/motor, konsumsi FGD, serta 16 anggota/narasumber/petugas survei sesuai dokumen otentik.</div>' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn ok block" style="margin-top:4px" onclick="confirmLoadRealData()">📥 Muat Data Riil Riset Bu Nadhiroh</button>' +
+      '</div>' +
+    '</div>',
+    'Tutup',
+    () => closeSheet()
+  );
+}
+
+function confirmClearData(keepPersonnel) {
+  closeSheet();
+  const txCount = S?.txns?.length || 0;
+  const payCount = S?.payrolls?.length || 0;
+  sheet('Konfirmasi Kosongkan Data',
+    '<div class="stack">' +
+      '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:14px">' +
+        '<h3 style="color:var(--bad);margin:0 0 6px">⚠️ Apakah Anda Yakin?</h3>' +
+        '<p class="small muted" style="margin:0;line-height:1.5">' +
+          'Seluruh catatan transaksi kas (' + txCount + ') dan slip honorarium (' + payCount + ') akan dihapus secara permanen.<br><br>' +
+          (keepPersonnel ? '• Daftar nama anggota tim (' + (S?.workers?.length || 0) + ' orang) <b>tetap dipertahankan</b>.' : '• Daftar personel juga akan direset ke ketua peneliti saja.') +
+        '</p>' +
+      '</div>' +
+      '<button class="btn bad block" onclick="doClearDummyData(' + (keepPersonnel ? 'true' : 'false') + ')">Ya, Hapus &amp; Kosongkan Sekarang</button>' +
+      '<button class="btn block" onclick="closeSheet()">Batal</button>' +
+    '</div>',
+    'Batal',
+    () => closeSheet()
+  );
+}
+
+function confirmLoadRealData() {
+  closeSheet();
+  sheet('Konfirmasi Muat Data Riil Riset',
+    '<div class="stack">' +
+      '<div class="card" style="background:var(--panel2);border-left:4px solid var(--ok);padding:14px">' +
+        '<h3 style="color:var(--ok);margin:0 0 6px">📥 Muat Data Riil dari Dokumen RAB Excel</h3>' +
+        '<p class="small muted" style="margin:0;line-height:1.5">' +
+          'Sistem akan mengisi buku kas dengan data otentik penelitian Bu Nadhiroh (Gresik &amp; Batu 2026):<br>' +
+          '• Hibah Termin 1: Rp 84.000.000 (70% dari Pagu Rp 120.000.000)<br>' +
+          '• Sewa Posko Riset &amp; PPh Final 4(2) 10%<br>' +
+          '• Sewa Armada Mobil/Motor &amp; PPh 23 2%<br>' +
+          '• Konsumsi FGD Gresik &amp; Transport Mukti Wibowo<br>' +
+          '• 16 Personel lengkap (Ketua, Peneliti, Pengolah Data, Narasumber &amp; 8 Petugas Survei RT)' +
+        '</p>' +
+      '</div>' +
+      '<button class="btn ok block" onclick="doLoadRealExcelData()">Ya, Muat Data Riil Riset Sekarang</button>' +
+      '<button class="btn block" onclick="closeSheet()">Batal</button>' +
+    '</div>',
+    'Batal',
+    () => closeSheet()
+  );
+}
+
+function doClearDummyData(keepPersonnel = false) {
+  closeSheet();
+  S = getCleanSlateSeed(keepPersonnel);
+  saveState();
+  fetch('/api/audit/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'DATA_CLEARED',
+      category: 'data',
+      description: 'Pengguna mengosongkan seluruh data dummy kas dan slip (Clean Slate)' + (keepPersonnel ? ' [pertahankan tim]' : ' [reset total]')
+    })
+  }).catch(() => {});
+  toast('✨ Data kas berhasil dikosongkan! Siap untuk tim peneliti.');
+  render();
+}
+
+function doLoadRealExcelData() {
+  closeSheet();
+  S = getRealResearchSeed();
+  saveState();
+  fetch('/api/audit/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'DATA_SEEDED_EXCEL',
+      category: 'data',
+      description: 'Pengguna memuat seluruh data riil riset Bu Nadhiroh dari RAB Excel (12 transaksi, 16 personel)'
+    })
+  }).catch(() => {});
+  toast('📥 Data riil riset Bu Nadhiroh dari RAB Excel berhasil dimuat!');
+  render();
 }
 
 /* State management */
@@ -1455,7 +1989,7 @@ async function doLogin() {
       toast('Berhasil masuk sebagai ' + ME.name + ' (' + (ROLE_L[ME.role] || ME.role) + ')');
       loadUsers();
       loadServerRoles();
-      if (canAdmin()) {
+      if (canSuperAdmin()) {
         checkBackupStatus();
         loadAuditLogs();
       }
@@ -1507,7 +2041,7 @@ function vNadi() {
       '</div>' +
     '</div>' +
 
-    (canAdmin() && BACKUP_STATUS && BACKUP_STATUS.needsBackup ?
+    (canSuperAdmin() && BACKUP_STATUS && BACKUP_STATUS.needsBackup ?
       '<div class="card" style="background:linear-gradient(135deg, rgba(245,158,11,0.12), rgba(225,29,72,0.08));border:1.5px solid var(--warning);padding:12px 14px">' +
         '<div class="row between">' +
           '<div style="flex:1">' +
@@ -2395,7 +2929,7 @@ function vLainnya() {
       '</div>' +
     '</div>' +
 
-    (canAdmin() ?
+    (canSuperAdmin() ?
       '<div class="stack" style="gap:6px;margin-top:4px">' +
         '<div class="lab" style="color:var(--bad);font-weight:800;display:flex;align-items:center;gap:6px">' +
           '<span>👑</span> WEWENANG KHUSUS SUPERADMIN' +
@@ -2458,6 +2992,14 @@ function vLainnya() {
         '<div class="t">' +
           '<b>Data Proyek Penelitian</b>' +
           '<span>Ubah judul, pagu hibah, bank &amp; buat proyek baru</span>' +
+        '</div>' +
+        '<div class="r">›</div>' +
+      '</button>' +
+      '<button class="it" onclick="sheetManageDummyData()">' +
+        '<div class="avatar" style="color:var(--bad)">🧹</div>' +
+        '<div class="t">' +
+          '<b>Kelola &amp; Reset Data Dummy / Excel</b>' +
+          '<span>Kosongkan data untuk tim peneliti atau muat RAB Excel</span>' +
         '</div>' +
         '<div class="r">›</div>' +
       '</button>' +
@@ -2573,7 +3115,7 @@ const PERM_LABELS = {
 };
 
 function vRoles() {
-  if (!canAdmin()) {
+  if (!canSuperAdmin()) {
     return '<div class="stack">' +
       backBar('Kelola Peran &amp; Hak Akses') +
       '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
@@ -2763,26 +3305,27 @@ function vUsers() {
       backBar('Kelola Pengguna &amp; Peran') +
       '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
         '<h3>Akses Ditolak</h3>' +
-        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Super Admin</b> yang berhak mengelola akun pengguna sistem demi keamanan data keuangan riset.</p>' +
-        '<button class="btn pri block" onclick="sheetSwitchAccount()">Login Sebagai Super Admin</button>' +
+        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Administrator</b> yang berhak mengelola akun pengguna sistem demi keamanan data keuangan riset.</p>' +
+        '<button class="btn pri block" onclick="sheetSwitchAccount()">Login Sebagai Administrator</button>' +
       '</div>' +
     '</div>';
   }
   const defaultList = [
-    { id: 1, username: 'admin', name: 'Astro Administrator', role: 'superadmin', active: 1 },
-    { id: 2, username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', active: 1 },
-    { id: 3, username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', active: 1 },
-    { id: 4, username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', active: 1 }
+    { id: 1, username: 'superadmin', name: 'Zandev Superadmin (Master)', role: 'superadmin', active: 1 },
+    { id: 2, username: 'admin', name: 'Administrator Operasional', role: 'admin', active: 1 },
+    { id: 3, username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', active: 1 },
+    { id: 4, username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', active: 1 },
+    { id: 5, username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', active: 1 }
   ];
   const list = (USERS && USERS.length) ? USERS : defaultList;
 
   return '<div class="stack">' +
     backBar('Kelola Pengguna &amp; Peran') +
     '<div class="note" style="border-left:4px solid var(--helm);background:var(--panel2);padding:10px 12px;border-radius:10px;font-size:13px">' +
-      '<b>Tiga Peran Utama ZanFin:</b><br>' +
-      '• <b>Super Admin:</b> Semua proyek, tambah/edit semua akun pengguna.<br>' +
-      '• <b>Ketua Peneliti:</b> Persetujuan belanja & tanda tangan kuitansi LPJ.<br>' +
-      '• <b>Bendahara Proyek:</b> Catat kas, bayar honor tim, potong pajak Coretax & SPJ.' +
+      '<b>Tingkatan Akses Akun ZanFin:</b><br>' +
+      '• <b>Super Admin:</b> Catatan mata-mata, backup VPS &amp; kontrol penuh sistem.<br>' +
+      '• <b>Admin Operasional:</b> Input/edit belanja, slip gaji, kelola akun tim riset.<br>' +
+      '• <b>Ketua &amp; Bendahara:</b> Pengesahan belanja, potong pajak Coretax &amp; SPJ.' +
     '</div>' +
 
     '<button class="btn pri block" onclick="sheetUserEdit()">+ Tambah Pengguna Baru</button>' +
@@ -2817,13 +3360,34 @@ async function loadUsers() {
 
 function sheetUserEdit(userId = null) {
   const u = userId && USERS ? USERS.find(x => x.id === userId) : null;
+  const isTargetSuper = u && u.role === 'superadmin';
+  const isSelf = u && u.id === ME?.id;
+  const cannotEditTarget = isTargetSuper && !canSuperAdmin();
+
+  if (cannotEditTarget) {
+    sheet('Detail Akun: ' + u.name,
+      '<div class="stack">' +
+        '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:14px">' +
+          '<div class="lab" style="color:var(--bad)">Proteksi Superadmin Master</div>' +
+          '<div style="font-size:16px;font-weight:700;margin:4px 0">' + esc(u.name) + ' (@' + esc(u.username) + ')</div>' +
+          '<p class="small muted" style="margin:4px 0 0">Akun dengan peran <b>Super Admin</b> hanya dapat diubah atau dikelola langsung oleh pemegang akun Super Admin.</p>' +
+        '</div>' +
+      '</div>',
+      'Tutup',
+      () => closeSheet()
+    );
+    return;
+  }
+
+  const roleOptions = getRoles().filter(r => canSuperAdmin() || r.id !== 'superadmin');
+
   sheet(u ? 'Edit Pengguna' : 'Tambah Pengguna Baru',
     '<div class="stack">' +
       fld('Username Akun', '<input id="fu-uname" value="' + esc(u ? u.username : '') + '" ' + (u ? 'disabled' : '') + ' placeholder="budi_bendahara">') +
       fld('Nama Lengkap', '<input id="fu-name" value="' + esc(u ? u.name : '') + '" placeholder="Budi Santoso, S.Kom">') +
       fld('Peran Akun',
         '<select id="fu-role">' +
-          getRoles().map(r =>
+          roleOptions.map(r =>
             '<option value="' + r.id + '" ' + (u && u.role === r.id ? 'selected' : '') + '>' + r.icon + ' ' + r.name + ' (' + (r.tag || r.name) + ')</option>'
           ).join('') +
         '</select>'
@@ -2835,7 +3399,7 @@ function sheetUserEdit(userId = null) {
           '<span>Akun Aktif (Bisa Login)</span>' +
         '</label>'
       ) : '') +
-      (u && u.id !== ME?.id ?
+      (u && !isSelf && (!isTargetSuper || canSuperAdmin()) && (canSuperAdmin() || u.role !== 'admin') ?
         '<button type="button" class="btn bad block" style="margin-top:8px" onclick="deleteUser(' + u.id + ', \'' + esc(u.username) + '\')">Hapus Akun Pengguna</button>' : '') +
     '</div>',
     u ? 'Simpan Perubahan' : 'Buat Akun',
@@ -2907,7 +3471,7 @@ async function deleteUser(userId, uname) {
    SUB-VIEW: CATATAN MATA-MATA & AUDIT LOG (SUPERADMIN ONLY)
    ========================================================================== */
 async function loadAuditLogs(cat = AUDIT_CAT, q = AUDIT_SEARCH) {
-  if (!canAdmin()) return;
+  if (!canSuperAdmin()) return;
   AUDIT_LOADING = true;
   try {
     const url = `/api/audit-logs?cat=${encodeURIComponent(cat)}&q=${encodeURIComponent(q)}&limit=150`;
@@ -2967,12 +3531,12 @@ async function doAuditPurge(mode) {
 }
 
 function vAudit() {
-  if (!canAdmin()) {
+  if (!canSuperAdmin()) {
     return '<div class="stack">' +
       backBar('Catatan Mata-mata &amp; Audit Log') +
       '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
         '<h3>Akses Ditolak</h3>' +
-        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Super Admin</b> yang memiliki hak akses untuk memantau log aktivitas mata-mata sistem.</p>' +
+        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Super Admin</b> yang memiliki hak akses untuk memantau log aktivitas mata-mata sistem. Administrator Operasional tidak memiliki wewenang untuk fitur ini.</p>' +
       '</div>' +
     '</div>';
   }
@@ -3165,7 +3729,7 @@ async function doRestoreFromVps(filename) {
 }
 
 function vBackup() {
-  if (!canAdmin()) {
+  if (!canSuperAdmin()) {
     return '<div class="stack">' +
       backBar('Pusat Backup &amp; Pemulihan Sistem') +
       '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
@@ -3333,6 +3897,19 @@ function vProyek() {
 
     '<button class="btn pri block" onclick="sheetProyekEdit(\'' + p.id + '\')">Edit Data Proyek Ini</button>' +
     '<button class="btn block" onclick="sheetProyekNew()">+ Buat Proyek Penelitian Baru</button>' +
+
+    (canAdmin() ?
+      '<div class="card stack" style="gap:10px;margin-top:4px;border:1.5px solid var(--glass-line)">' +
+        '<div class="row between" style="align-items:center">' +
+          '<div class="lab" style="color:var(--helm);font-weight:800">🗂️ KELOLA DATA &amp; RESET DUMMY</div>' +
+          '<span class="pill" style="font-size:10px">Admin Action</span>' +
+        '</div>' +
+        '<p class="small muted" style="margin:0">Bersihkan seluruh data dummy untuk tim peneliti baru, atau muat data otentik dari dokumen RAB Excel.</p>' +
+        '<div class="stack" style="gap:8px;margin-top:2px">' +
+          '<button class="btn block" style="color:var(--bad);border-color:rgba(239,68,68,0.3)" onclick="confirmClearData(true)">🧹 Kosongkan Data Dummy (Clean Slate)</button>' +
+          '<button class="btn ok block" onclick="confirmLoadRealData()">📥 Muat Data Riil Riset (RAB Excel Bu Nadhiroh)</button>' +
+        '</div>' +
+      '</div>' : '') +
 
     (S.projects.length > 1 ? '<div class="card list">' +
       '<h3 style="padding:10px 0 4px">Daftar Semua Proyek</h3>' +
@@ -3615,10 +4192,10 @@ function go(v, s = null) {
     sub = s;
     if (s) subFrom = view;
   }
-  if (sub === 'audit' && canAdmin()) {
+  if (sub === 'audit' && canSuperAdmin()) {
     loadAuditLogs();
   }
-  if (sub === 'backup' && canAdmin()) {
+  if (sub === 'backup' && canSuperAdmin()) {
     checkBackupStatus();
   }
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -3667,7 +4244,7 @@ function sheetSwitchRole() {
         '<button class="btn pri block" onclick="sheetSwitchAccount()">Ganti Akun (Login)</button>' +
       '</div>' +
 
-      (canAdmin() ?
+      (canSuperAdmin() ?
         '<button class="btn block" onclick="closeSheet();go(null, \'roles\')">🎭 Kelola Peran &amp; Hak Akses</button>' : '') +
 
       '<button class="btn bad block" onclick="closeSheet();doLogout()">Keluar (Logout)</button>' +
@@ -3790,7 +4367,7 @@ async function init() {
       ME = data.user;
       MODE = 'server';
       loadUsers();
-      if (canAdmin()) {
+      if (canSuperAdmin()) {
         checkBackupStatus();
       }
       captureGps().then(pos => {
