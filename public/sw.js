@@ -1,6 +1,6 @@
 /* ZanFin service worker — app shell cache + graceful update.
    Build n Code by zandev.id */
-const VERSION = 'zanfin-v2.4.0';
+const VERSION = 'zanfin-v2.5.0';
 const SHELL = [
   './',
   './index.html',
@@ -8,6 +8,9 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable.png',
+  './logo/fintax_logo.svg',
+  './logo/fintax_logo_wide.svg',
+  './logo/fintax_favicon.svg',
   './vendor/xlsx.full.min.js'
 ];
 
