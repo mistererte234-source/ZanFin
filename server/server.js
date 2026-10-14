@@ -162,7 +162,7 @@ function verifyPass(pwd, stored) {
 const defaultSeedUsers = [
   { username: 'superadmin', name: 'Zandev Superadmin (Master)', role: 'superadmin', pass: 'superadmin123' },
   { username: 'admin', name: 'Administrator Operasional', role: 'admin', pass: 'admin123' },
-  { username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', pass: 'ketua123' },
+  { username: 'ketua', name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.', role: 'ketua', pass: 'ketua123' },
   { username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', pass: 'bendahara123' },
   { username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', pass: 'peneliti123' }
 ];

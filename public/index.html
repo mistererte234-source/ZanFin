@@ -154,20 +154,51 @@ h1, h2, h3 { margin: 0; line-height: 1.15; }
 h2 { font-size: 21px; font-weight: 800; font-stretch: 112%; }
 h3 { font-size: 16px; font-weight: 750; }
 
-/* Sticky Top Header */
+/* Sticky Top Header (iOS Premium Responsive) */
 header.top {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
-  z-index: 10;
+  z-index: 25;
   background: var(--glass);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
   margin: 0 -16px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--glass-line);
+}
+
+.top-inner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  width: 100%;
+}
+
+.top-mobile-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.top-brand-logo {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-weight: 850;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+  user-select: none;
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .projbtn {
@@ -176,28 +207,79 @@ header.top {
   text-align: left;
   background: none;
   border: 0;
-  padding: 0;
+  padding: 2px 0;
   cursor: pointer;
   display: flex;
   flex-direction: column;
 }
-.projbtn b {
+
+.proj-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.proj-head b {
   display: block;
-  font-size: 17px;
+  font-size: 15.5px;
   font-weight: 800;
   font-stretch: 112%;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
 }
+
+.proj-chevron {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 .projbtn span {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--muted);
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* Mobile Layout (< 520px): Clean 2-Tier Stack, No Collision Ever */
+@media (max-width: 520px) {
+  header.top {
+    padding: 7px 14px 8px;
+  }
+  .top-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .top-mobile-bar {
+    width: 100%;
+  }
+  .top-brand-logo {
+    display: inline-flex;
+  }
+  .top-inner .projbtn {
+    width: 100%;
+    padding: 5px 10px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .top-inner .proj-head b {
+    font-size: 13.5px;
+  }
+  .top-inner .projbtn span {
+    font-size: 11px;
+  }
 }
 
 .pill {
@@ -891,7 +973,7 @@ const ROLES = {
     icon: '🎓',
     badgeClass: 'info',
     user: 'ketua',
-    person: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+    person: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
     desc: 'Persetujuan belanja, pengesahan kuitansi LPJ & monitoring serapan.'
   },
   bendahara: {
@@ -1038,15 +1120,15 @@ function getRealResearchSeed() {
       {
         id: pid,
         name: 'Riset Resiliensi Pangan & Gizi (Gresik & Batu)',
-        leader: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
-        institution: 'Fakultas Kesehatan Masyarakat Universitas Airlangga',
+        leader: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
+        institution: 'Fakultas Kesehatan Masyarakat, Universitas Airlangga',
         scheme: 'Penelitian Terapan Unggulan PT (Kemendikbudristek)',
         year: 2026,
         pagu: 120000000,
         saldo: 0,
         bank: 'Bank BNI Kantor Cabang Graha Unair',
         acc: '0987654321',
-        holder: 'Dr. Ir. Hj. Nadhiroh, M.Kes'
+        holder: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.'
       }
     ],
     txns: [
@@ -1279,7 +1361,7 @@ function getRealResearchSeed() {
       {
         id: 'w_1',
         pid: pid,
-        name: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+        name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
         role: 'Ketua Peneliti',
         nik: '3578014502680001',
         npwp: '07.123.456.7-604.000',
@@ -1580,15 +1662,15 @@ function getCleanSlateSeed(keepPersonnel = false) {
   const currentP = P() || {
     id: 'p_resiliensi_2026',
     name: 'Riset Resiliensi Pangan & Gizi (Gresik & Batu)',
-    leader: 'Dr. Ir. Hj. Nadhiroh, M.Kes',
-    institution: 'Fakultas Kesehatan Masyarakat Universitas Airlangga',
+    leader: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
+    institution: 'Fakultas Kesehatan Masyarakat, Universitas Airlangga',
     scheme: 'Penelitian Terapan Unggulan PT (Kemendikbudristek)',
     year: 2026,
     pagu: 120000000,
     saldo: 0,
     bank: 'Bank BNI Kantor Cabang Graha Unair',
     acc: '0987654321',
-    holder: 'Dr. Ir. Hj. Nadhiroh, M.Kes'
+    holder: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.'
   };
 
   const currentRoles = S?.roles && S.roles.length ? S.roles : getRealResearchSeed().roles;
@@ -1601,7 +1683,7 @@ function getCleanSlateSeed(keepPersonnel = false) {
       {
         id: 'w_1',
         pid: currentP.id,
-        name: currentP.leader || 'Dr. Ir. Hj. Nadhiroh, M.Kes',
+        name: currentP.leader || 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
         role: 'Ketua Peneliti',
         nik: '',
         npwp: '',
@@ -1793,6 +1875,29 @@ function loadState() {
   if (!S || !S.projects || !S.projects.length) {
     S = defaultSeed();
     saveState();
+  } else {
+    let migrated = false;
+    if (S.projects) {
+      for (const p of S.projects) {
+        if (p.leader && p.leader.includes('Dr. Ir. Hj. Nadhiroh')) {
+          p.leader = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
+          migrated = true;
+        }
+        if (p.holder && p.holder.includes('Dr. Ir. Hj. Nadhiroh')) {
+          p.holder = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
+          migrated = true;
+        }
+      }
+    }
+    if (S.workers) {
+      for (const w of S.workers) {
+        if (w.name && w.name.includes('Dr. Ir. Hj. Nadhiroh')) {
+          w.name = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
+          migrated = true;
+        }
+      }
+    }
+    if (migrated) saveState();
   }
 }
 
@@ -1976,7 +2081,7 @@ const moneyIn = (id, val = '') =>
 const backBar = (title, to = subFrom) =>
   !sub
     ? '<h2 style="margin:4px 0 10px">' + title + '</h2>'
-    : '<div class="row" style="margin:4px 0 12px"><button class="iconbtn" onclick="go(null, null)" aria-label="Kembali" style="font-size:22px;min-width:38px;min-height:38px">‹</button><h2>' + title + '</h2></div>';
+    : '<div class="row" style="margin:4px 0 12px"><button class="iconbtn" onclick="go(subFrom || \'nadi\', null)" aria-label="Kembali" style="font-size:22px;min-width:38px;min-height:38px">‹</button><h2>' + title + '</h2></div>';
 
 /* Project getters */
 const P = () => S.projects.find(p => p.id === S.activeId) || S.projects[0];
@@ -2148,16 +2253,21 @@ function vNadi() {
   const curRole = ROLES[CURRENT_ROLE] || ROLES.bendahara;
   const userObj = ME || { name: curRole.person || curRole.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
   return '<div class="stack">' +
-    '<div class="card" style="background:var(--panel2);border-left:4px solid ' + curRole.color + ';padding:10px 14px;cursor:pointer" onclick="sheetSwitchRole()">' +
+    '<div class="card" style="background:var(--panel2);border-left:4px solid var(--helm);padding:12px 14px;cursor:pointer" onclick="go(null, \'akun\')">' +
       '<div class="row between" style="align-items:center">' +
-        '<div class="row" style="gap:10px;align-items:center">' +
-          renderAvatar(userObj, 40) +
-          '<div>' +
-            '<div class="tiny muted" style="font-weight:700;text-transform:uppercase">Masuk Sebagai ' + curRole.name + '</div>' +
-            '<b style="font-size:15px">' + esc(userObj.name) + '</b>' +
+        '<div class="row" style="gap:12px;align-items:center;min-width:0;flex:1">' +
+          renderAvatar(userObj, 42) +
+          '<div style="min-width:0;flex:1">' +
+            '<div class="tiny muted" style="font-weight:700;text-transform:uppercase;letter-spacing:0.3px">' +
+              'Sesi Aktif · <span class="pill ' + (curRole.badgeClass || 'ok') + '" style="font-size:10px;padding:1px 6px">' + esc(curRole.name) + '</span>' +
+            '</div>' +
+            '<b style="font-size:15px;display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(userObj.name) + '</b>' +
           '</div>' +
         '</div>' +
-        '<span class="small link" style="font-weight:700">Profil ›</span>' +
+        '<div class="row" style="gap:6px;flex-shrink:0">' +
+          '<button class="btn sm pri" onclick="event.stopPropagation();go(null, \'akun\')">Edit Profil</button>' +
+          '<button class="btn sm" onclick="event.stopPropagation();sheetSwitchRole()" title="Ganti Akun / Peran">Beralih</button>' +
+        '</div>' +
       '</div>' +
     '</div>' +
 
@@ -2911,7 +3021,7 @@ function sheetWorkerEdit(id = null) {
   const w = id ? S.workers.find(x => x.id === id) : null;
   sheet(w ? 'Edit Data Personel' : 'Tambah Personel Penelitian',
     '<div class="stack">' +
-      fld('Nama Lengkap (dengan Gelar)', '<input id="fw-name" value="' + esc(w ? w.name : '') + '" placeholder="Dr. Ir. Contoh, M.Sc">') +
+      fld('Nama Lengkap (dengan Gelar)', '<input id="fw-name" value="' + esc(w ? w.name : '') + '" placeholder="Dr. Siti Contoh, M.Kes">') +
       fld('Peran dalam Penelitian',
         '<select id="fw-role">' +
           ['Ketua Peneliti', 'Anggota Peneliti', 'Asisten Peneliti', 'Data Analyst / Asisten IT', 'Enumerator Survei', 'Narasumber / Pakar', 'Teknisi / Laboran'].map(r =>
@@ -3915,7 +4025,7 @@ function vUsers() {
   const defaultList = [
     { id: 1, username: 'superadmin', name: 'Zandev Superadmin (Master)', role: 'superadmin', active: 1 },
     { id: 2, username: 'admin', name: 'Administrator Operasional', role: 'admin', active: 1 },
-    { id: 3, username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', active: 1 },
+    { id: 3, username: 'ketua', name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.', role: 'ketua', active: 1 },
     { id: 4, username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', active: 1 },
     { id: 5, username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', active: 1 }
   ];
@@ -5065,8 +5175,10 @@ function go(v, s = null) {
     sub = null;
   }
   if (s !== undefined) {
+    if (s && !v) {
+      subFrom = view || 'nadi';
+    }
     sub = s;
-    if (s) subFrom = view;
   }
   if (sub === 'audit' && canSuperAdmin()) {
     loadAuditLogs();
@@ -5087,17 +5199,31 @@ function renderHeader() {
   const userObj = ME || { name: r.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
 
   topEl.innerHTML =
-    '<button class="projbtn" onclick="go(null, \'proyek\')">' +
-      '<b>' + esc(p.name) + '</b>' +
-      '<span>' + esc(p.scheme || 'Riset Kemendikbudristek') + ' · ' + p.year + '</span>' +
-    '</button>' +
-    '<button class="pill ' + r.badgeClass + '" onclick="sheetSwitchRole()" aria-label="Ganti Peran" title="Klik untuk menu akun & ganti peran" style="padding:3px 10px 3px 4px;gap:6px">' +
-      renderAvatar(userObj, 22) +
-      '<b>' + r.tag + '</b>' +
-    '</button>' +
-    '<button class="iconbtn" onclick="toggleTheme()" aria-label="Ganti Tema" style="min-width:36px;min-height:36px">' +
-      svg(isDark ? 'sun' : 'moon') +
-    '</button>';
+    '<div class="top-inner">' +
+      '<div class="top-mobile-bar">' +
+        '<div class="top-brand-logo">' +
+          '<span style="font-size:18px">🏛️</span>' +
+          '<span>Zan<span style="color:var(--helm)">Fin</span></span>' +
+        '</div>' +
+        '<div class="top-controls">' +
+          '<button class="pill ' + (r.badgeClass || 'ok') + '" onclick="sheetSwitchRole()" aria-label="Ganti Peran" title="Klik untuk menu akun & ganti peran" style="padding:3px 10px 3px 5px;gap:6px">' +
+            renderAvatar(userObj, 22) +
+            '<b>' + r.tag + '</b>' +
+          '</button>' +
+          '<button class="iconbtn" onclick="toggleTheme()" aria-label="Ganti Tema" style="min-width:34px;min-height:34px;border-radius:50%">' +
+            svg(isDark ? 'sun' : 'moon') +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="projbtn" onclick="go(null, \'proyek\')" title="Ganti atau kelola proyek penelitian">' +
+        '<div class="proj-head">' +
+          '<span style="font-size:14px;flex-shrink:0">📁</span>' +
+          '<b>' + esc(p.name) + '</b>' +
+          '<span class="proj-chevron">›</span>' +
+        '</div>' +
+        '<span>' + esc(p.scheme || 'Riset Kemendikbudristek') + ' · ' + p.year + '</span>' +
+      '</button>' +
+    '</div>';
 }
 
 function sheetSwitchRole() {
@@ -5216,7 +5342,16 @@ function render() {
   const viewEl = $('#view');
   if (!viewEl) return;
 
-  if (view === 'nadi') viewEl.innerHTML = vNadi();
+  if (sub === 'akun') viewEl.innerHTML = vAkun();
+  else if (sub === 'proyek') viewEl.innerHTML = vProyek();
+  else if (sub === 'ekspor') viewEl.innerHTML = vEkspor();
+  else if (sub === 'spj') viewEl.innerHTML = vSpj();
+  else if (sub === 'pajak') viewEl.innerHTML = vPajak();
+  else if (sub === 'users') viewEl.innerHTML = vUsers();
+  else if (sub === 'roles') viewEl.innerHTML = vRoles();
+  else if (sub === 'audit') viewEl.innerHTML = vAudit();
+  else if (sub === 'backup') viewEl.innerHTML = vBackup();
+  else if (view === 'nadi') viewEl.innerHTML = vNadi();
   else if (view === 'kas') viewEl.innerHTML = vKas();
   else if (view === 'tim') viewEl.innerHTML = vTim();
   else if (view === 'honor') viewEl.innerHTML = vHonor();

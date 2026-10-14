@@ -622,7 +622,7 @@ const htmlContent = `<!DOCTYPE html>
         <td><span class="mono">admin123</span></td>
       </tr>
       <tr>
-        <td><b>Dr. Ir. Hj. Nadhiroh, M.Kes</b></td>
+        <td><b>Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.</b></td>
         <td><span class="badge badge-purple">Ketua Peneliti</span></td>
         <td><span class="mono">ketua</span></td>
         <td><span class="mono">ketua123</span></td>
