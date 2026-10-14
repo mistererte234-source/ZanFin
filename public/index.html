@@ -697,6 +697,29 @@ const ROLE_L = {
 
 let CURRENT_ROLE = localStorage.getItem('zanfin_role') || 'bendahara';
 
+function getRoles() {
+  const base = S?.roles && S.roles.length ? S.roles : Object.values(ROLES);
+  return base;
+}
+
+function getRole(id) {
+  return getRoles().find(r => r.id === id) || ROLES[id] || ROLES.bendahara;
+}
+
+async function loadServerRoles() {
+  try {
+    const r = await fetch('/api/roles');
+    if (r.ok) {
+      const data = await r.json();
+      if (data.roles && data.roles.length) {
+        S.roles = data.roles;
+        saveState();
+      }
+    }
+  } catch (e) {}
+}
+
+
 /* Tax rate rules for research */
 const GOL_RULES = {
   'pns_iv': { label: 'PNS Gol IV (Tarif Final 15%)', rate: 0.15, final: true },
@@ -730,6 +753,13 @@ function defaultSeed() {
   const pid = 'p_resiliensi_2026';
   return {
     activeId: pid,
+    roles: [
+      { id: 'superadmin', name: 'Super Admin', tag: 'Admin', icon: '👑', badgeClass: 'bad', desc: 'Semua proyek, kelola semua akun & pengaturan sistem.', perms: { kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true }, system: true },
+      { id: 'ketua', name: 'Ketua Peneliti', tag: 'Ketua', icon: '🎓', badgeClass: 'info', desc: 'Pengesahan belanja, tanda tangan kuitansi LPJ & serapan anggaran.', perms: { kas_in: true, kas_out: false, honor: false, approve: true, tax: true, users: false, spj: true, export: true }, system: true },
+      { id: 'bendahara', name: 'Bendahara Proyek', tag: 'Bendahara', icon: '💼', badgeClass: 'ok', desc: 'Input kas harian, penggajian honor, pemotongan pajak Coretax & SPJ.', perms: { kas_in: true, kas_out: true, honor: true, approve: false, tax: true, users: false, spj: true, export: true }, system: true },
+      { id: 'peneliti', name: 'Anggota Peneliti', tag: 'Peneliti', icon: '🔬', badgeClass: 'warning', desc: 'Pantau progres pelaksanaan riset dan serapan anggaran.', perms: { kas_in: false, kas_out: false, honor: false, approve: false, tax: false, users: false, spj: true, export: true }, system: false },
+      { id: 'asisten', name: 'Asisten Peneliti', tag: 'Asisten', icon: '📋', badgeClass: 'info', desc: 'Input draft belanja lapangan dan verifikasi kelengkapan nota SPJ.', perms: { kas_in: false, kas_out: true, honor: false, approve: false, tax: false, users: false, spj: true, export: false }, system: false }
+    ],
     projects: [
       {
         id: pid,
@@ -2005,6 +2035,7 @@ function deletePayroll(id) {
 function vLainnya() {
   if (sub === 'pajak') return vPajak();
   if (sub === 'users') return vUsers();
+  if (sub === 'roles') return vRoles();
   if (sub === 'spj') return vSpj();
   if (sub === 'proyek') return vProyek();
   if (sub === 'ekspor') return vEkspor();
@@ -2158,6 +2189,195 @@ function exportCoretaxCSV() {
   toast('File CSV Coretax siap diimpor ke e-Bupot');
 }
 
+
+/* ==========================================================================
+   SUB-VIEW: KELOLA PERAN (ROLE MANAGEMENT)
+   ========================================================================== */
+const PERM_LABELS = {
+  kas_in: 'Catat Kas Masuk (Pencairan)',
+  kas_out: 'Catat Belanja Kas Keluar',
+  honor: 'Bayar Honorarium Tim',
+  approve: 'Approval & TTD Kuitansi LPJ',
+  tax: 'Pajak Coretax DJP',
+  spj: 'Verifikasi Berkas SPJ',
+  export: 'Ekspor BKU & Excel',
+  users: 'Kelola Pengguna Sistem'
+};
+
+function vRoles() {
+  const roles = getRoles();
+  return '<div class="stack">' +
+    backBar('Kelola Peran &amp; Hak Akses') +
+    '<div class="note" style="border-left:4px solid var(--helm);background:var(--panel2);padding:10px 12px;border-radius:10px;font-size:13px">' +
+      'Di sini lo bisa <b>tambah peran baru</b>, ubah nama, ikon emoji, deskripsi wewenang, dan matriks hak akses untuk tiap peran di proyek penelitian.' +
+    '</div>' +
+
+    '<button class="btn pri block" onclick="sheetRoleEdit()">+ Tambah Peran Baru</button>' +
+
+    '<div class="card list">' +
+      roles.map(r => {
+        const perms = r.perms || {};
+        const activePerms = Object.keys(PERM_LABELS).filter(k => perms[k]);
+        return '<button class="it" onclick="sheetRoleEdit(\'' + r.id + '\')">' +
+          '<div class="avatar" style="font-size:22px">' + (r.icon || '📋') + '</div>' +
+          '<div class="t">' +
+            '<b>' + esc(r.name) + ' <span class="pill ' + (r.badgeClass || 'info') + '" style="font-size:10px;padding:1px 6px">' + esc(r.tag || r.name) + '</span>' + (r.system ? ' <span class="pill" style="font-size:10px;padding:1px 6px">Sistem</span>' : '') + '</b>' +
+            '<span>' + esc(r.desc || 'Wewenang tugas penelitian') + '</span>' +
+            '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">' +
+              activePerms.slice(0, 3).map(k => '<span class="pill ok" style="font-size:9.5px;padding:1px 5px">' + PERM_LABELS[k].split(' ')[0] + ' ' + (PERM_LABELS[k].split(' ')[1]||'') + '</span>').join('') +
+              (activePerms.length > 3 ? '<span class="pill" style="font-size:9.5px;padding:1px 5px">+' + (activePerms.length - 3) + ' wewenang</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="r">' +
+            '<span class="small" style="color:var(--info);font-weight:700">Edit ›</span>' +
+          '</div>' +
+        '</button>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+function sheetRoleEdit(roleId = null) {
+  const isNew = !roleId;
+  const r = roleId ? getRole(roleId) : {
+    id: '',
+    name: '',
+    tag: '',
+    icon: '📋',
+    badgeClass: 'info',
+    desc: '',
+    perms: { kas_in: true, kas_out: true, honor: false, approve: false, tax: false, spj: true, export: true, users: false },
+    system: false
+  };
+
+  const EMOJI_OPTIONS = ['👑', '🎓', '💼', '🔬', '📋', '⚖️', '🔍', '🛡️', '📊', '🏛️', '📝', '🤝', '🩺', '🧪', '👨‍🏫'];
+
+  sheet(isNew ? 'Tambah Peran Baru' : 'Edit Peran: ' + r.name,
+    '<div class="stack">' +
+      (r.system ? '<div class="note" style="background:var(--panel2);font-size:12px;padding:8px 10px;border-radius:8px">ℹ️ Ini peran bawaan sistem riset. Nama &amp; hak akses bisa lo sesuaikan, tapi ID peran dikunci.</div>' : '') +
+      fld('ID / Kode Peran (Unik)', '<input id="f-role-id" value="' + esc(r.id) + '" ' + (!isNew ? 'disabled' : '') + ' placeholder="misal: reviewer_lppm">', 'Huruf kecil, tanpa spasi (misal: verifikator, koordinator)') +
+      fld('Nama Peran', '<input id="f-role-name" value="' + esc(r.name) + '" placeholder="misal: Verifikator Berkas LPPM">') +
+      fld('Singkatan / Tag Header', '<input id="f-role-tag" value="' + esc(r.tag || r.name) + '" placeholder="misal: Verifikator">', 'Tampil di pill header atas') +
+      
+      fld('Pilih Icon Emoji',
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0">' +
+          EMOJI_OPTIONS.map(em =>
+            '<button type="button" class="btn sm" onclick="selectRoleEmoji(\'' + em + '\')" style="min-width:38px;padding:0 6px;font-size:18px;' + ((r.icon || '📋') === em ? 'background:var(--ink);color:var(--bg)' : '') + '" id="em-' + em + '">' + em + '</button>'
+          ).join('') +
+        '</div>' +
+        '<input type="hidden" id="f-role-icon" value="' + (r.icon || '📋') + '">'
+      ) +
+
+      fld('Warna Badge',
+        '<select id="f-role-badge">' +
+          [['ok', 'Hijau (Success / Keuangan)'], ['info', 'Biru (Info / Akademik)'], ['bad', 'Merah (Ketat / Admin)'], ['warning', 'Kuning (Perhatian / Lapangan)']].map(([k, l]) =>
+            '<option value="' + k + '" ' + (r.badgeClass === k ? 'selected' : '') + '>' + l + '</option>'
+          ).join('') +
+        '</select>'
+      ) +
+
+      fld('Deskripsi Tanggung Jawab', '<textarea id="f-role-desc" placeholder="Tugas utama peran ini dalam riset...">' + esc(r.desc || '') + '</textarea>') +
+
+      '<div class="card" style="background:var(--panel2)">' +
+        '<div class="lab" style="margin-bottom:8px">Matriks Hak Akses / Wewenang:</div>' +
+        Object.entries(PERM_LABELS).map(([permKey, permLabel]) =>
+          '<label class="row" style="cursor:pointer;padding:5px 0">' +
+            '<input type="checkbox" class="perm-chk" data-k="' + permKey + '" ' + (r.perms && r.perms[permKey] ? 'checked' : '') + ' style="width:20px;height:20px;accent-color:var(--helm)">' +
+            '<span style="font-size:13.5px;font-weight:600">' + permLabel + '</span>' +
+          '</label>'
+        ).join('') +
+      '</div>' +
+
+      (!isNew && !r.system ?
+        '<button type="button" class="btn bad block" style="margin-top:8px" onclick="deleteRole(\'' + r.id + '\')">Hapus Peran Ini</button>' : '') +
+    '</div>',
+    isNew ? 'Buat Peran' : 'Simpan Perubahan',
+    async () => {
+      const idInp = $('#f-role-id').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const name = $('#f-role-name').value.trim();
+      const tag = $('#f-role-tag').value.trim() || name;
+      const icon = $('#f-role-icon').value || '📋';
+      const badgeClass = $('#f-role-badge').value;
+      const desc = $('#f-role-desc').value.trim();
+
+      if (!idInp) { $('#sheet-e').textContent = 'ID Peran wajib diisi.'; return; }
+      if (!name) { $('#sheet-e').textContent = 'Nama Peran wajib diisi.'; return; }
+
+      const perms = {};
+      $('.perm-chk').forEach(chk => {
+        perms[chk.dataset.k] = chk.checked;
+      });
+
+      // Update S.roles
+      S.roles = S.roles || getRoles().slice();
+      const idx = S.roles.findIndex(x => x.id === (isNew ? idInp : r.id));
+      const roleObj = {
+        id: isNew ? idInp : r.id,
+        name,
+        tag,
+        icon,
+        badgeClass,
+        desc,
+        perms,
+        system: Boolean(r.system)
+      };
+
+      if (idx >= 0) {
+        S.roles[idx] = roleObj;
+      } else {
+        S.roles.push(roleObj);
+      }
+      saveState();
+
+      // Sync to server if online
+      try {
+        await fetch('/api/roles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(roleObj)
+        });
+      } catch (e) {}
+
+      closeSheet();
+      toast(isNew ? 'Peran baru berhasil ditambahkan' : 'Peran diperbarui');
+      render();
+    }
+  );
+}
+
+function selectRoleEmoji(em) {
+  const hiddenInp = $('#f-role-icon');
+  if (hiddenInp) hiddenInp.value = em;
+  $('[id^="em-"]').forEach(btn => {
+    btn.style.background = '';
+    btn.style.color = '';
+  });
+  const selectedBtn = $('#em-' + em);
+  if (selectedBtn) {
+    selectedBtn.style.background = 'var(--ink)';
+    selectedBtn.style.color = 'var(--bg)';
+  }
+}
+
+async function deleteRole(roleId) {
+  if (!confirm('Yakin ingin menghapus peran ini?')) return;
+  S.roles = (S.roles || getRoles()).filter(x => x.id !== roleId);
+  saveState();
+  if (CURRENT_ROLE === roleId) {
+    selectRole('bendahara');
+  }
+  try {
+    await fetch('/api/roles', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: roleId })
+    });
+  } catch (e) {}
+  closeSheet();
+  toast('Peran dihapus');
+  render();
+}
+
 /* Sub-View: Kelola Pengguna */
 function vUsers() {
   const defaultList = [
@@ -2215,8 +2435,8 @@ function sheetUserEdit(userId = null) {
       fld('Nama Lengkap', '<input id="fu-name" value="' + esc(u ? u.name : '') + '" placeholder="Budi Santoso, S.Kom">') +
       fld('Peran Akun',
         '<select id="fu-role">' +
-          Object.entries(ROLE_L).map(([k, v]) =>
-            '<option value="' + k + '" ' + (u && u.role === k ? 'selected' : '') + '>' + v + '</option>'
+          getRoles().map(r =>
+            '<option value="' + r.id + '" ' + (u && u.role === r.id ? 'selected' : '') + '>' + r.icon + ' ' + r.name + ' (' + (r.tag || r.name) + ')</option>'
           ).join('') +
         '</select>'
       ) +
@@ -2642,7 +2862,8 @@ function renderHeader() {
 }
 
 function sheetSwitchRole() {
-  const cur = ROLES[CURRENT_ROLE] || ROLES.bendahara;
+  const allRoles = getRoles();
+  const cur = getRole(CURRENT_ROLE);
   sheet('Pilih Peran Pengguna (Role)',
     '<div class="stack">' +
       '<div class="card" style="background:var(--panel2)">' +
@@ -2656,9 +2877,12 @@ function sheetSwitchRole() {
         '</div>' +
       '</div>' +
 
-      '<h3 style="margin:6px 0 2px">Ganti ke Peran:</h3>' +
+      '<div class="row between" style="margin:4px 0 0">' +
+        '<h3 style="margin:0">Ganti ke Peran:</h3>' +
+        '<button class="link small" onclick="closeSheet();go(null, \'roles\')">⚙️ Kelola Peran</button>' +
+      '</div>' +
       '<div class="card list">' +
-        Object.values(ROLES).map(r =>
+        allRoles.map(r =>
           '<button class="it" onclick="selectRole(\'' + r.id + '\')">' +
             '<div class="avatar" style="font-size:20px">' + r.icon + '</div>' +
             '<div class="t">' +
@@ -2674,6 +2898,7 @@ function sheetSwitchRole() {
 
       '<div class="row" style="gap:8px;margin-top:4px">' +
         '<button class="btn block" style="flex:1" onclick="sheetLoginRole()">Login Akun Server</button>' +
+        '<button class="btn pri block" style="flex:1" onclick="closeSheet();sheetRoleEdit()">+ Tambah Role</button>' +
       '</div>' +
     '</div>',
     'Tutup',
@@ -2757,6 +2982,7 @@ async function init() {
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update()).catch(() => {});
   }
 
+  loadServerRoles();
   render();
 }
 

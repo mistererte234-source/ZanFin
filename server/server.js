@@ -30,10 +30,22 @@ CREATE TABLE IF NOT EXISTS users(
   id INTEGER PRIMARY KEY,
   username TEXT UNIQUE NOT NULL COLLATE NOCASE,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('superadmin','ketua','bendahara','peneliti','asisten')),
+  role TEXT NOT NULL,
   pass TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1,
   perm_rev INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS roles(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  tag TEXT,
+  icon TEXT,
+  badge_class TEXT,
+  description TEXT,
+  perms TEXT,
+  system INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
@@ -106,6 +118,29 @@ for (const u of defaultSeedUsers) {
     `).run(u.username, u.name, u.role, hash, Date.now());
     console.log(`[ZanFin] Akun default dibuat: ${u.username} (${u.role}), pass: ${u.pass}`);
   }
+}
+
+// Seed default system roles
+const defaultRoles = [
+  { id: 'superadmin', name: 'Super Admin', tag: 'Admin', icon: '👑', badge_class: 'bad', description: 'Semua proyek, kelola semua akun & pengaturan sistem.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: true, tax: true, users: true, spj: true, export: true }), system: 1 },
+  { id: 'ketua', name: 'Ketua Peneliti', tag: 'Ketua', icon: '🎓', badge_class: 'info', description: 'Pengesahan belanja, tanda tangan kuitansi LPJ & serapan anggaran.', perms: JSON.stringify({ kas_in: true, kas_out: false, honor: false, approve: true, tax: true, users: false, spj: true, export: true }), system: 1 },
+  { id: 'bendahara', name: 'Bendahara Proyek', tag: 'Bendahara', icon: '💼', badge_class: 'ok', description: 'Input kas harian, penggajian honor, pemotongan pajak Coretax & SPJ.', perms: JSON.stringify({ kas_in: true, kas_out: true, honor: true, approve: false, tax: true, users: false, spj: true, export: true }), system: 1 },
+  { id: 'peneliti', name: 'Anggota Peneliti', tag: 'Peneliti', icon: '🔬', badge_class: 'warning', description: 'Pantau progres pelaksanaan riset dan serapan anggaran.', perms: JSON.stringify({ kas_in: false, kas_out: false, honor: false, approve: false, tax: false, users: false, spj: true, export: true }), system: 0 },
+  { id: 'asisten', name: 'Asisten Peneliti', tag: 'Asisten', icon: '📋', badge_class: 'info', description: 'Input draft belanja lapangan dan verifikasi kelengkapan nota SPJ.', perms: JSON.stringify({ kas_in: false, kas_out: true, honor: false, approve: false, tax: false, users: false, spj: true, export: false }), system: 0 }
+];
+
+for (const r of defaultRoles) {
+  db.prepare(`
+    INSERT INTO roles (id, name, tag, icon, badge_class, description, perms, system, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      tag = excluded.tag,
+      icon = excluded.icon,
+      badge_class = excluded.badge_class,
+      description = excluded.description,
+      perms = excluded.perms
+  `).run(r.id, r.name, r.tag, r.icon, r.badge_class, r.description, r.perms, r.system, Date.now());
 }
 
 function parseCookies(req) {
@@ -347,6 +382,94 @@ const server = http.createServer(async (req, res) => {
         }
         const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
+      }
+    }
+
+    if (pathname === '/api/roles') {
+      if (req.method === 'GET') {
+        const rows = db.prepare('SELECT * FROM roles ORDER BY system DESC, created_at ASC').all();
+        const roles = rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          tag: r.tag,
+          icon: r.icon,
+          badgeClass: r.badge_class,
+          desc: r.description,
+          perms: JSON.parse(r.perms || '{}'),
+          system: Boolean(r.system)
+        }));
+        return sendJson(res, 200, { roles });
+      }
+
+      if (req.method === 'POST') {
+        const user = getSessionUser(req);
+        if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa menambah / mengedit peran' });
+        const body = JSON.parse(await readBody(req));
+        const { id, name, tag, icon, badgeClass, desc, perms } = body;
+        if (!id || !name) return sendJson(res, 400, { error: 'ID dan Nama Peran wajib diisi' });
+
+        const cleanId = id.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        const existing = db.prepare('SELECT system FROM roles WHERE id = ?').get(cleanId);
+        const isSystem = existing ? existing.system : 0;
+
+        db.prepare(`
+          INSERT INTO roles (id, name, tag, icon, badge_class, description, perms, system, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            tag = excluded.tag,
+            icon = excluded.icon,
+            badge_class = excluded.badge_class,
+            description = excluded.description,
+            perms = excluded.perms
+        `).run(
+          cleanId,
+          name.trim(),
+          (tag || name).trim(),
+          icon || '📋',
+          badgeClass || 'info',
+          (desc || '').trim(),
+          JSON.stringify(perms || {}),
+          isSystem,
+          Date.now()
+        );
+
+        const rows = db.prepare('SELECT * FROM roles ORDER BY system DESC, created_at ASC').all();
+        const roles = rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          tag: r.tag,
+          icon: r.icon,
+          badgeClass: r.badge_class,
+          desc: r.description,
+          perms: JSON.parse(r.perms || '{}'),
+          system: Boolean(r.system)
+        }));
+        return sendJson(res, 200, { ok: true, roles });
+      }
+
+      if (req.method === 'DELETE') {
+        const user = getSessionUser(req);
+        if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa menghapus peran' });
+        const body = JSON.parse(await readBody(req));
+        const { id } = body;
+        const role = db.prepare('SELECT system FROM roles WHERE id = ?').get(id);
+        if (!role) return sendJson(res, 404, { error: 'Peran tidak ditemukan' });
+        if (role.system) return sendJson(res, 400, { error: 'Peran bawaan sistem tidak boleh dihapus' });
+
+        db.prepare('DELETE FROM roles WHERE id = ?').run(id);
+        const rows = db.prepare('SELECT * FROM roles ORDER BY system DESC, created_at ASC').all();
+        const roles = rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          tag: r.tag,
+          icon: r.icon,
+          badgeClass: r.badge_class,
+          desc: r.description,
+          perms: JSON.parse(r.perms || '{}'),
+          system: Boolean(r.system)
+        }));
+        return sendJson(res, 200, { ok: true, roles });
       }
     }
 
