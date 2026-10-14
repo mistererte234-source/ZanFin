@@ -1168,6 +1168,89 @@ function totalPajak(pid) {
 }
 
 /* ==========================================================================
+   VIEW: LOGIN SCREEN (AUTHENTICATION GATEWAY)
+   ========================================================================== */
+function vLogin() {
+  return '<div class="stack" style="padding-top:36px;max-width:400px;margin:0 auto">' +
+    '<div style="text-align:center;margin-bottom:12px">' +
+      '<div style="width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,var(--helm),#059669);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:32px;box-shadow:0 8px 24px rgba(16,185,129,.28);margin-bottom:12px">' +
+        '🏛️' +
+      '</div>' +
+      '<h2 style="font-size:26px;font-weight:800;letter-spacing:-0.02em">Zan<span style="color:var(--helm)">Fin</span></h2>' +
+      '<div class="small muted" style="font-weight:600;margin-top:2px">Sistem Kontrol Keuangan &amp; Pajak Penelitian</div>' +
+    '</div>' +
+
+    '<div class="card stack" style="padding:20px;gap:14px;box-shadow:0 4px 20px rgba(0,0,0,.08)">' +
+      '<h3 style="margin:0 0 2px;font-size:18px">Masuk ke Sistem</h3>' +
+      fld('Username', '<input id="l-u" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="admin / ketua / bendahara">') +
+      fld('Password', '<input id="l-p" type="password" autocomplete="current-password" placeholder="••••••••">') +
+      '<p class="err" id="l-e" style="margin:0"></p>' +
+      '<button class="btn pri block" id="btn-login" onclick="doLogin()">Masuk</button>' +
+    '</div>' +
+
+    '<div class="card" style="background:var(--panel2);padding:14px">' +
+      '<div class="lab" style="margin-bottom:8px">Pilih Akun Cepat (Demo / Uji Coba):</div>' +
+      '<div class="stack" style="gap:8px;font-size:13px">' +
+        '<div class="row between"><span>👑 <b>Super Admin:</b> <code>admin</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickAdmin()">Isi Form</button></div>' +
+        '<div class="row between"><span>🎓 <b>Ketua Peneliti:</b> <code>ketua</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickKetua()">Isi Form</button></div>' +
+        '<div class="row between"><span>💼 <b>Bendahara Proyek:</b> <code>bendahara</code></span><button type="button" class="btn sm" style="padding:0 10px;min-height:30px;font-size:11.5px" onclick="quickBendahara()">Isi Form</button></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+
+function quickAdmin() { quickFillLogin('admin', 'admin123'); }
+function quickKetua() { quickFillLogin('ketua', 'ketua123'); }
+function quickBendahara() { quickFillLogin('bendahara', 'bendahara123'); }
+
+function quickFillLogin(u, p) {
+  const uInp = $('#l-u');
+  const pInp = $('#l-p');
+  if (uInp) uInp.value = u;
+  if (pInp) pInp.value = p;
+  const btn = $('#btn-login');
+  if (btn) btn.focus();
+}
+
+async function doLogin() {
+  const u = $('#l-u')?.value.trim();
+  const pw = $('#l-p')?.value || '';
+  const btn = $('#btn-login');
+  const er = $('#l-e');
+  if (!u || !pw) {
+    if (er) er.textContent = 'Masukkan username dan password.';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa…'; }
+  if (er) er.textContent = '';
+
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: pw })
+    });
+    const res = await r.json();
+    if (r.ok && res.user) {
+      ME = res.user;
+      CURRENT_ROLE = ME.role;
+      MODE = 'server';
+      toast('Berhasil masuk sebagai ' + ME.name + ' (' + (ROLE_L[ME.role] || ME.role) + ')');
+      loadUsers();
+      loadServerRoles();
+      render();
+    } else {
+      if (er) er.textContent = res.error || 'Username atau password salah.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Masuk'; }
+    }
+  } catch (err) {
+    if (er) er.textContent = 'Gagal terhubung ke server: ' + err.message;
+    if (btn) { btn.disabled = false; btn.textContent = 'Masuk'; }
+  }
+}
+
+/* ==========================================================================
    VIEW 1: NADI (Dashboard Kontrol Hibah & Kas)
    ========================================================================== */
 function vNadi() {
