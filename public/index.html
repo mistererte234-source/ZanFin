@@ -696,11 +696,47 @@ const ROLE_L = {
 };
 
 let CURRENT_ROLE = 'bendahara';
+let CURRENT_GPS = null;
+let AUDIT_LOGS = [];
+let AUDIT_STATS = { today: 0, failedToday: 0, total: 0 };
+let AUDIT_CAT = 'all';
+let AUDIT_SEARCH = '';
+let AUDIT_LOADING = false;
+let BACKUP_STATUS = null;
+let SELECTED_RESTORE_FILE = null;
 
 /* Role-Based Access Control (RBAC) helpers */
 function canAdmin() { return ME && ME.role === 'superadmin'; }
 function canApprove() { return ME && (ME.role === 'ketua' || ME.role === 'superadmin'); }
 function canSpend() { return ME && (ME.role === 'bendahara' || ME.role === 'superadmin'); }
+
+function captureGps() {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        CURRENT_GPS = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          acc: Math.round(pos.coords.accuracy)
+        };
+        resolve(CURRENT_GPS);
+      },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
+    );
+  });
+}
+
+async function checkBackupStatus() {
+  if (!canAdmin()) return;
+  try {
+    const r = await fetch('/api/backup/status');
+    if (r.ok) {
+      BACKUP_STATUS = await r.json();
+    }
+  } catch (e) {}
+}
 
 
 function getRoles() {
@@ -1205,11 +1241,19 @@ async function doLogin() {
   if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa…'; }
   if (er) er.textContent = '';
 
+  const gps = CURRENT_GPS || await captureGps();
+
   try {
     const r = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: pw })
+      body: JSON.stringify({
+        username: u,
+        password: pw,
+        lat: gps?.lat,
+        lng: gps?.lng,
+        acc: gps?.acc
+      })
     });
     const res = await r.json();
     if (r.ok && res.user) {
@@ -1219,6 +1263,19 @@ async function doLogin() {
       toast('Berhasil masuk sebagai ' + ME.name + ' (' + (ROLE_L[ME.role] || ME.role) + ')');
       loadUsers();
       loadServerRoles();
+      if (canAdmin()) {
+        checkBackupStatus();
+        loadAuditLogs();
+      }
+      captureGps().then(pos => {
+        if (pos) {
+          fetch('/api/audit/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pos)
+          }).catch(() => {});
+        }
+      });
       render();
     } else {
       if (er) er.textContent = res.error || 'Username atau password salah.';
@@ -1257,6 +1314,21 @@ function vNadi() {
         '<span class="small link" style="font-weight:700">Ganti Peran ›</span>' +
       '</div>' +
     '</div>' +
+
+    (canAdmin() && BACKUP_STATUS && BACKUP_STATUS.needsBackup ?
+      '<div class="card" style="background:linear-gradient(135deg, rgba(245,158,11,0.12), rgba(225,29,72,0.08));border:1.5px solid var(--warning);padding:12px 14px">' +
+        '<div class="row between">' +
+          '<div style="flex:1">' +
+            '<div class="row" style="gap:6px;align-items:center">' +
+              '<span style="font-size:18px">⚠️</span>' +
+              '<b style="color:var(--warning);font-size:14px">Peringatan Backup Mingguan</b>' +
+            '</div>' +
+            '<div class="small muted" style="margin-top:2px">Database belum dicadangkan selama <b>' + (BACKUP_STATUS.daysSinceLastBackup >= 999 ? 'lebih dari 7 hari' : BACKUP_STATUS.daysSinceLastBackup + ' hari') + '</b>. Amankan salinan data penelitian sekarang!</div>' +
+          '</div>' +
+          '<button class="btn sm pri" onclick="doBackupDownload()" style="white-space:nowrap;margin-left:8px">💾 Backup</button>' +
+        '</div>' +
+      '</div>' : '') +
+
     '<section class="hero" aria-label="Kas Hibah">' +
       '<div class="lab">Kas di Rekening Penelitian</div>' +
       '<div class="big">' + bigRp(k) + '</div>' +
@@ -2105,6 +2177,8 @@ function vLainnya() {
   if (sub === 'pajak') return vPajak();
   if (sub === 'users') return vUsers();
   if (sub === 'roles') return vRoles();
+  if (sub === 'audit') return vAudit();
+  if (sub === 'backup') return vBackup();
   if (sub === 'spj') return vSpj();
   if (sub === 'proyek') return vProyek();
   if (sub === 'ekspor') return vEkspor();
@@ -2128,6 +2202,39 @@ function vLainnya() {
         '<button class="btn sm" onclick="sheetSwitchRole()">Ganti Peran</button>' +
       '</div>' +
     '</div>' +
+
+    (canAdmin() ?
+      '<div class="stack" style="gap:6px;margin-top:4px">' +
+        '<div class="lab" style="color:var(--bad);font-weight:800;display:flex;align-items:center;gap:6px">' +
+          '<span>👑</span> WEWENANG KHUSUS SUPERADMIN' +
+        '</div>' +
+        '<div class="card list" style="border:1.5px solid rgba(225,29,72,0.3);box-shadow:0 4px 16px rgba(225,29,72,0.06)">' +
+          '<button class="it" onclick="go(null, \'audit\')">' +
+            '<div class="avatar" style="color:var(--bad);background:rgba(225,29,72,0.1)">🕵️‍♂️</div>' +
+            '<div class="t">' +
+              '<b style="color:var(--bad)">Catatan Mata-mata &amp; Log Aktivitas</b>' +
+              '<span>Siapa login, edit, IP, device, GPS &amp; jam</span>' +
+            '</div>' +
+            '<div class="r">›</div>' +
+          '</button>' +
+          '<button class="it" onclick="go(null, \'backup\')">' +
+            '<div class="avatar" style="color:var(--ok);background:rgba(16,185,129,0.1)">💾</div>' +
+            '<div class="t">' +
+              '<b>Pusat Backup &amp; Pemulihan Sistem</b>' +
+              '<span>' + (BACKUP_STATUS && BACKUP_STATUS.needsBackup ? '<span style="color:var(--warning);font-weight:750">⚠️ Perlu backup segera</span>' : 'Snapshot mandiri, auto mingguan &amp; restore data') + '</span>' +
+            '</div>' +
+            '<div class="r">›</div>' +
+          '</button>' +
+          '<button class="it" onclick="go(null, \'roles\')">' +
+            '<div class="avatar" style="color:var(--info);background:rgba(2,132,199,0.1)">🎭</div>' +
+            '<div class="t">' +
+              '<b>Kelola Peran &amp; Hak Akses</b>' +
+              '<span>Atur izin bendahara, ketua &amp; peran kustom</span>' +
+            '</div>' +
+            '<div class="r">›</div>' +
+          '</button>' +
+        '</div>' +
+      '</div>' : '') +
 
     '<div class="card list">' +
       '<button class="it" onclick="go(null, \'pajak\')">' +
@@ -2604,6 +2711,371 @@ async function deleteUser(userId, uname) {
   }
 }
 
+/* ==========================================================================
+   SUB-VIEW: CATATAN MATA-MATA & AUDIT LOG (SUPERADMIN ONLY)
+   ========================================================================== */
+async function loadAuditLogs(cat = AUDIT_CAT, q = AUDIT_SEARCH) {
+  if (!canAdmin()) return;
+  AUDIT_LOADING = true;
+  try {
+    const url = `/api/audit-logs?cat=${encodeURIComponent(cat)}&q=${encodeURIComponent(q)}&limit=150`;
+    const r = await fetch(url);
+    if (r.ok) {
+      const data = await r.json();
+      AUDIT_LOGS = data.logs || [];
+      if (data.stats) AUDIT_STATS = data.stats;
+    }
+  } catch (e) {
+    console.error('Failed to load audit logs', e);
+  } finally {
+    AUDIT_LOADING = false;
+    render();
+  }
+}
+
+let auditSearchTimer = null;
+function onAuditSearch(val) {
+  AUDIT_SEARCH = val;
+  clearTimeout(auditSearchTimer);
+  auditSearchTimer = setTimeout(() => {
+    loadAuditLogs(AUDIT_CAT, AUDIT_SEARCH);
+  }, 300);
+}
+
+function filterAuditCat(cat) {
+  AUDIT_CAT = cat;
+  loadAuditLogs(cat, AUDIT_SEARCH);
+}
+
+function sheetAuditPurge() {
+  showSheet('Bersihkan Catatan Log', '<div class="stack" style="gap:12px">' +
+    '<p class="small muted">Pilih tindakan pembersihan riwayat log mata-mata untuk menghemat ruang penyimpanan database:</p>' +
+    '<button class="btn block" onclick="doAuditPurge(30)">🧹 Hapus Log yang Lebih Tua dari 30 Hari</button>' +
+    '<button class="btn bad block" onclick="doAuditPurge(\'all\')">🗑️ Hapus Seluruh Riwayat Log (Wipe Total)</button>' +
+  '</div>', 'Tutup');
+}
+
+async function doAuditPurge(mode) {
+  if (!confirm(mode === 'all' ? 'PERINGATAN: Seluruh catatan log aktivitas akan dihapus permanen. Lanjutkan?' : 'Hapus catatan log yang lebih lama dari 30 hari?')) return;
+  closeSheet();
+  try {
+    const payload = mode === 'all' ? { all: true } : { olderThanDays: 30 };
+    const r = await fetch('/api/audit-logs', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      toast('Catatan log berhasil dibersihkan');
+      loadAuditLogs();
+    }
+  } catch (e) {
+    alert('Gagal membersihkan log: ' + e.message);
+  }
+}
+
+function vAudit() {
+  if (!canAdmin()) {
+    return '<div class="stack">' +
+      backBar('Catatan Mata-mata &amp; Audit Log') +
+      '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
+        '<h3>Akses Ditolak</h3>' +
+        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Super Admin</b> yang memiliki hak akses untuk memantau log aktivitas mata-mata sistem.</p>' +
+      '</div>' +
+    '</div>';
+  }
+
+  const chips = [
+    ['all', 'Semua Log'],
+    ['auth', '🔑 Login / Auth'],
+    ['data', '💰 Kas & Transaksi'],
+    ['tim', '👥 Kelola Akun'],
+    ['sistem', '⚙️ Konfigurasi'],
+    ['backup', '💾 Backup & Restore']
+  ];
+
+  let listHtml = '';
+  if (AUDIT_LOADING && AUDIT_LOGS.length === 0) {
+    listHtml = '<div class="card small muted" style="text-align:center;padding:32px">Memuat data log aktivitas…</div>';
+  } else if (AUDIT_LOGS.length === 0) {
+    listHtml = '<div class="card small muted" style="text-align:center;padding:32px">Belum ada riwayat aktivitas yang tercatat untuk filter ini.</div>';
+  } else {
+    listHtml = AUDIT_LOGS.map(log => {
+      const isFailed = log.action === 'LOGIN_FAILED';
+      const isRestore = log.action.includes('RESTORE');
+      const isDelete = log.action.includes('DELETE');
+
+      const avatar = isFailed ? '🚨' : (log.role === 'superadmin' ? '👑' : (log.role === 'ketua' ? '🎓' : (log.role === 'bendahara' ? '💼' : (log.category === 'backup' ? '💾' : '📝'))));
+      const borderCol = isFailed ? 'var(--bad)' : (isRestore ? 'var(--warning)' : (log.role === 'superadmin' ? 'var(--bad)' : 'var(--line)'));
+
+      const dt = new Date(log.created_at);
+      const timeStr = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      let gpsHtml = '';
+      if (log.gps_lat != null && log.gps_lng != null) {
+        const mapsUrl = `https://www.google.com/maps?q=${log.gps_lat},${log.gps_lng}`;
+        gpsHtml = '<a href="' + mapsUrl + '" target="_blank" rel="noopener" class="pill" style="background:rgba(16,185,129,0.12);color:var(--ok);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px">' +
+          '📍 ' + log.gps_lat.toFixed(4) + ', ' + log.gps_lng.toFixed(4) + ' (±' + (log.gps_acc || 0) + 'm) <span style="font-size:11px">↗ Maps</span>' +
+        '</a>';
+      } else {
+        gpsHtml = '<span class="pill muted" style="font-size:11px">📍 GPS Off / Ditutup</span>';
+      }
+
+      return '<div class="card" style="border-left:3.5px solid ' + borderCol + ';padding:12px 14px">' +
+        '<div class="row between" style="align-items:flex-start">' +
+          '<div class="row" style="gap:8px;align-items:center">' +
+            '<span style="font-size:20px">' + avatar + '</span>' +
+            '<div>' +
+              '<div class="row" style="gap:6px;align-items:center">' +
+                '<b style="font-size:14px">' + esc(log.username || 'Tamu / Anon') + '</b>' +
+                '<span class="badge ' + (isFailed ? 'bad' : (log.role === 'superadmin' ? 'bad' : 'info')) + '">' + esc(log.role || 'guest') + '</span>' +
+              '</div>' +
+              '<div class="tiny muted num">' + dateStr + ' · ' + timeStr + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<span class="badge ' + (isFailed || isDelete ? 'bad' : 'ok') + '" style="font-size:10.5px">' + esc(log.action) + '</span>' +
+        '</div>' +
+
+        '<div style="font-size:13.5px;margin:8px 0 6px;line-height:1.4">' + esc(log.description) + '</div>' +
+
+        '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">' +
+          '<span class="pill" style="background:var(--panel2);font-size:11px">' + esc(log.device_info || 'Perangkat Tidak Dikenal') + '</span>' +
+          '<a href="https://ipinfo.io/' + esc(log.ip) + '" target="_blank" rel="noopener" class="pill" style="background:var(--panel2);text-decoration:none;color:var(--ink);font-size:11px">' +
+            '🌐 IP: ' + esc(log.ip) + ' ↗' +
+          '</a>' +
+          gpsHtml +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  return '<div class="stack">' +
+    backBar('Catatan Mata-mata &amp; Audit Log') +
+
+    '<div class="hero" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%)">' +
+      '<div class="lab" style="color:var(--hero-muted)">Pusat Intelijen Sistem ZanFin</div>' +
+      '<div class="big" style="font-size:clamp(24px,6.8vw,32px);color:#38bdf8">🕵️‍♂️ Catatan Aktivitas</div>' +
+      '<div class="words">Memantau siapapun yang login, mengedit data, IP, device &amp; koordinat GPS</div>' +
+      '<div class="flow">' +
+        '<div>Total Aksi<b>' + AUDIT_STATS.total + '</b></div>' +
+        '<div>Aktivitas Hari Ini<b>' + AUDIT_STATS.today + '</b></div>' +
+        '<div>Percobaan Gagal<b style="color:var(--bad)">' + AUDIT_STATS.failedToday + '</b></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:10px 14px">' +
+      '<div class="row" style="gap:8px">' +
+        '<input type="search" id="audit-search-input" value="' + esc(AUDIT_SEARCH) + '" placeholder="🔍 Cari username, IP, aksi, atau perangkat…" oninput="onAuditSearch(this.value)" style="flex:1;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;background:var(--bg)">' +
+        '<button class="btn sm" onclick="loadAuditLogs()" title="Segarkan">🔄</button>' +
+        '<button class="btn sm bad" onclick="sheetAuditPurge()" title="Bersihkan Log">🗑️</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="fchips">' +
+      chips.map(([id, label]) =>
+        '<button class="fchip" aria-pressed="' + (AUDIT_CAT === id ? 'true' : 'false') + '" onclick="filterAuditCat(\'' + id + '\')">' + label + '</button>'
+      ).join('') +
+    '</div>' +
+
+    '<div class="stack" style="gap:10px">' +
+      listHtml +
+    '</div>' +
+  '</div>';
+}
+
+/* ==========================================================================
+   SUB-VIEW: PUSAT BACKUP & PEMULIHAN SISTEM (SUPERADMIN ONLY)
+   ========================================================================== */
+function doBackupDownload(filename = null) {
+  const url = filename ? ('/api/backup/download?file=' + encodeURIComponent(filename)) : '/api/backup/download';
+  toast('Menyiapkan file cadangan…');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || ('zanfin-backup-' + new Date().toISOString().slice(0, 10) + '.json');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    checkBackupStatus().then(render);
+    toast('Snapshot cadangan berhasil diunduh');
+  }, 1200);
+}
+
+function handleRestoreFileSelected(input) {
+  if (input.files && input.files[0]) {
+    SELECTED_RESTORE_FILE = input.files[0];
+    render();
+  }
+}
+
+async function doRestoreSubmit() {
+  if (!SELECTED_RESTORE_FILE) {
+    alert('Pilih file cadangan (.json) terlebih dahulu');
+    return;
+  }
+  
+  if (!confirm('PERINGATAN RESIKO TINGGI:\n\nMemulihkan database akan menimpa seluruh transaksi, akun, peran, dan data sistem saat ini dengan isi file cadangan.\n\nApakah Anda benar-benar yakin ingin melanjutkan pemulihan data?')) {
+    return;
+  }
+
+  showSheet('Memulihkan Database…', '<div class="stack" style="text-align:center;padding:24px"><div style="font-size:36px">⏳</div><p>Sedang merekonstruksi data keuangan, akun & peran…</p></div>', '');
+  
+  try {
+    const text = await SELECTED_RESTORE_FILE.text();
+    const r = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: text
+    });
+    const res = await r.json();
+    if (r.ok) {
+      closeSheet();
+      alert('Berhasil! Database telah dipulihkan (' + res.restored.records + ' data, ' + res.restored.users + ' akun, ' + (res.restored.roles || 0) + ' peran).\n\nAplikasi akan dimuat ulang sekarang.');
+      location.reload();
+    } else {
+      closeSheet();
+      alert('Gagal memulihkan database: ' + (res.error || 'Terjadi kesalahan sistem'));
+    }
+  } catch (err) {
+    closeSheet();
+    alert('Terjadi kesalahan saat memproses file: ' + err.message);
+  }
+}
+
+async function doRestoreFromVps(filename) {
+  if (!confirm('PERINGATAN RESIKO:\n\nMemulihkan database dari snapshot server "' + filename + '" akan menimpa seluruh database aktif saat ini.\n\nLanjutkan pemulihan?')) {
+    return;
+  }
+  showSheet('Memulihkan Database…', '<div class="stack" style="text-align:center;padding:24px"><div style="font-size:36px">⏳</div><p>Mengambil file cadangan dari server dan merekonstruksi database…</p></div>', '');
+
+  try {
+    const rFile = await fetch('/api/backup/download?file=' + encodeURIComponent(filename));
+    const json = await rFile.text();
+    const r = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    });
+    const res = await r.json();
+    if (r.ok) {
+      closeSheet();
+      alert('Berhasil! Database dipulihkan dari snapshot server (' + res.restored.records + ' data, ' + res.restored.users + ' akun).\n\nHalaman akan dimuat ulang.');
+      location.reload();
+    } else {
+      closeSheet();
+      alert('Gagal: ' + (res.error || 'Gagal memulihkan'));
+    }
+  } catch (err) {
+    closeSheet();
+    alert('Gagal: ' + err.message);
+  }
+}
+
+function vBackup() {
+  if (!canAdmin()) {
+    return '<div class="stack">' +
+      backBar('Pusat Backup &amp; Pemulihan Sistem') +
+      '<div class="card" style="background:var(--panel2);border-left:4px solid var(--bad);padding:16px">' +
+        '<h3>Akses Ditolak</h3>' +
+        '<p class="small muted" style="margin:6px 0 12px">Hanya <b>Super Admin</b> yang memiliki hak akses untuk membackup dan memulihkan database sistem.</p>' +
+      '</div>' +
+    '</div>';
+  }
+
+  const bStatus = BACKUP_STATUS || { needsBackup: false, daysSinceLastBackup: 0, backupFiles: [] };
+  const isExpired = bStatus.needsBackup;
+
+  let autoFilesHtml = '';
+  if (bStatus.backupFiles && bStatus.backupFiles.length > 0) {
+    autoFilesHtml = bStatus.backupFiles.map(f => {
+      const szKb = (f.size / 1024).toFixed(1) + ' KB';
+      const dt = new Date(f.mtimeMs || f.date);
+      const timeStr = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      return '<div class="row between" style="padding:10px 0;border-bottom:1px solid var(--glass-line)">' +
+        '<div>' +
+          '<div class="row" style="gap:6px;align-items:center">' +
+            '<span>' + (f.isAuto ? '⏰' : '💾') + '</span>' +
+            '<b class="small" style="word-break:break-all">' + esc(f.name) + '</b>' +
+          '</div>' +
+          '<div class="tiny muted num" style="margin-top:2px">' + dateStr + ' ' + timeStr + ' · ' + szKb + '</div>' +
+        '</div>' +
+        '<div class="row" style="gap:6px;flex-shrink:0">' +
+          '<button class="btn sm" onclick="doBackupDownload(\'' + esc(f.name) + '\')">⬇️ Unduh</button>' +
+          '<button class="btn sm bad" onclick="doRestoreFromVps(\'' + esc(f.name) + '\')">🔄 Pulihkan</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    autoFilesHtml = '<div class="small muted" style="text-align:center;padding:16px">Belum ada file cadangan di server VPS.</div>';
+  }
+
+  return '<div class="stack">' +
+    backBar('Pusat Backup &amp; Pemulihan Sistem') +
+
+    '<div class="card" style="background:' + (isExpired ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(225,29,72,0.1))' : 'var(--panel2)') + ';border-left:4px solid ' + (isExpired ? 'var(--warning)' : 'var(--ok)') + ';padding:16px">' +
+      '<div class="row" style="gap:10px;align-items:flex-start">' +
+        '<span style="font-size:28px">' + (isExpired ? '⚠️' : '🛡️') + '</span>' +
+        '<div style="flex:1">' +
+          '<b style="font-size:16px;color:' + (isExpired ? 'var(--warning)' : 'var(--ok)') + '">' +
+            (isExpired ? 'Peringatan: Belum Dicadangkan > 7 Hari!' : 'Status Database: Terlindungi &amp; Aman') +
+          '</b>' +
+          '<p class="small muted" style="margin:4px 0 12px;line-height:1.4">' +
+            (isExpired ?
+              'Data sistem belum dicadangkan selama <b>' + (bStatus.daysSinceLastBackup >= 999 ? 'lama' : bStatus.daysSinceLastBackup + ' hari') + '</b>. Sangat disarankan untuk segera mengunduh snapshot cadangan database agar terhindar dari resiko kegagalan server.' :
+              'Cadangan data terakhir tersimpan pada server VPS. Anda dapat mengunduh snapshot terbaru kapan saja ke perangkat lokal Anda.') +
+          '</p>' +
+          '<button class="btn pri block" onclick="doBackupDownload()">' +
+            '💾 Unduh Snapshot Database Sekarang (.json)' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card stack" style="gap:10px">' +
+      '<div class="row between">' +
+        '<div>' +
+          '<h3 style="font-size:15.5px">Cadangan Mingguan Otomatis VPS</h3>' +
+          '<div class="small muted">Tersimpan di <code>/app/data/backups/</code> pada server</div>' +
+        '</div>' +
+        '<button class="btn sm" onclick="checkBackupStatus().then(render)" title="Segarkan">🔄</button>' +
+      '</div>' +
+      '<div style="margin-top:4px">' +
+        autoFilesHtml +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card stack" style="gap:12px;border:1.5px dashed var(--line);background:var(--panel)">' +
+      '<div>' +
+        '<h3 style="font-size:15.5px">Impor &amp; Pulihkan Data (Restore)</h3>' +
+        '<p class="small muted" style="margin:4px 0 0;line-height:1.4">' +
+          'Pilih file cadangan resmi <code>zanfin-backup-*.json</code> dari HP atau Laptop Anda untuk memulihkan seluruh data transaksi, peran, dan akun.' +
+        '</p>' +
+      '</div>' +
+
+      '<input type="file" id="restore-file-input" accept=".json,application/json" onchange="handleRestoreFileSelected(this)" style="display:none">' +
+
+      '<button class="card" onclick="$(\'#restore-file-input\').click()" style="text-align:center;padding:18px;border:1.5px dashed var(--info);background:rgba(2,132,199,0.05);cursor:pointer">' +
+        '<div style="font-size:26px">📂</div>' +
+        '<b style="color:var(--info);margin-top:6px;display:block">' +
+          (SELECTED_RESTORE_FILE ? 'File Terpilih: ' + esc(SELECTED_RESTORE_FILE.name) : 'Klik untuk Pilih File Cadangan (.json)') +
+        '</b>' +
+        '<div class="tiny muted" style="margin-top:2px">' +
+          (SELECTED_RESTORE_FILE ? (SELECTED_RESTORE_FILE.size / 1024).toFixed(1) + ' KB' : 'Mendukung file cadangan resmi ZanFin') +
+        '</div>' +
+      '</button>' +
+
+      (SELECTED_RESTORE_FILE ?
+        '<button class="btn bad block" onclick="doRestoreSubmit()">' +
+          '⚠️ Pulihkan Database Dari File Ini Sekarang' +
+        '</button>' : '') +
+    '</div>' +
+
+  '</div>';
+}
+
 /* Sub-View: Checklist SPJ */
 function vSpj() {
   const p = P();
@@ -2951,6 +3423,12 @@ function go(v, s = null) {
     sub = s;
     if (s) subFrom = view;
   }
+  if (sub === 'audit' && canAdmin()) {
+    loadAuditLogs();
+  }
+  if (sub === 'backup' && canAdmin()) {
+    checkBackupStatus();
+  }
   window.scrollTo({ top: 0, behavior: 'instant' });
   render();
 }
@@ -3120,6 +3598,18 @@ async function init() {
       ME = data.user;
       MODE = 'server';
       loadUsers();
+      if (canAdmin()) {
+        checkBackupStatus();
+      }
+      captureGps().then(pos => {
+        if (pos) {
+          fetch('/api/audit/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pos)
+          }).catch(() => {});
+        }
+      });
     }
   } catch (e) {
     MODE = 'local';

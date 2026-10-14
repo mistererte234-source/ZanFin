@@ -79,6 +79,27 @@ CREATE INDEX IF NOT EXISTS records_pid ON records(pid);
 
 CREATE TABLE IF NOT EXISTS counter(k TEXT PRIMARY KEY, v INTEGER NOT NULL);
 INSERT OR IGNORE INTO counter(k, v) VALUES ('rev', 0);
+
+CREATE TABLE IF NOT EXISTS audit_logs(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  username TEXT,
+  role TEXT,
+  action TEXT NOT NULL,
+  category TEXT NOT NULL,
+  description TEXT NOT NULL,
+  ip TEXT,
+  user_agent TEXT,
+  device_info TEXT,
+  gps_lat REAL,
+  gps_lng REAL,
+  gps_acc REAL,
+  metadata TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
 `);
 
 function nextRev() {
@@ -168,6 +189,178 @@ function getSessionUser(req) {
   return row || null;
 }
 
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) {
+    const ips = fwd.split(',');
+    return ips[0].trim();
+  }
+  return req.headers['x-real-ip'] || req.socket.remoteAddress || '127.0.0.1';
+}
+
+function parseDeviceInfo(ua = '') {
+  if (!ua) return 'Perangkat Tidak Dikenal';
+  let os = 'OS Lain';
+  let device = 'Desktop';
+  let browser = 'Browser';
+
+  if (/iPad/i.test(ua)) {
+    device = 'iPad';
+    os = 'iPadOS';
+  } else if (/iPhone/i.test(ua)) {
+    device = 'iPhone';
+    const m = ua.match(/OS (\d+[_\d]*)/);
+    os = m ? `iOS ${m[1].replace(/_/g, '.')}` : 'iOS';
+  } else if (/Android/i.test(ua)) {
+    const m = ua.match(/Android\s+([0-9.]+)/);
+    os = m ? `Android ${m[1]}` : 'Android';
+    if (/Samsung|SM-|GT-/i.test(ua)) device = 'Samsung';
+    else if (/Xiaomi|Redmi|POCO/i.test(ua)) device = 'Xiaomi';
+    else if (/OPPO|CPH/i.test(ua)) device = 'OPPO';
+    else if (/vivo/i.test(ua)) device = 'Vivo';
+    else device = 'Ponsel Android';
+  } else if (/Windows NT 10.0/i.test(ua)) {
+    os = 'Windows 10/11';
+    device = 'PC';
+  } else if (/Windows/i.test(ua)) {
+    os = 'Windows';
+    device = 'PC';
+  } else if (/Macintosh|Mac OS X/i.test(ua)) {
+    os = 'macOS';
+    device = 'Mac';
+  } else if (/Linux/i.test(ua)) {
+    os = 'Linux';
+    device = 'PC';
+  }
+
+  if (/Edg\//i.test(ua)) {
+    browser = 'Edge';
+  } else if (/Chrome\/([0-9]+)/i.test(ua) && !/Edg/i.test(ua)) {
+    browser = 'Chrome';
+  } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = 'Safari';
+  } else if (/Firefox\/([0-9]+)/i.test(ua)) {
+    browser = 'Firefox';
+  } else if (/OPR\//i.test(ua)) {
+    browser = 'Opera';
+  }
+
+  const isMobile = (device === 'iPhone' || device === 'iPad' || device === 'Samsung' || device === 'Xiaomi' || device === 'OPPO' || device === 'Vivo' || device === 'Ponsel Android');
+  const icon = isMobile ? '📱' : (device === 'Mac' ? '💻' : '🖥️');
+  return `${icon} ${device} (${os}) · ${browser}`;
+}
+
+function recordAudit(req, user, action, category, description, extra = {}) {
+  try {
+    const ip = extra.ip || (req ? getClientIp(req) : '127.0.0.1');
+    const ua = extra.ua || (req ? req.headers['user-agent'] : '');
+    const deviceInfo = extra.deviceInfo || parseDeviceInfo(ua);
+    const userId = user ? user.id : (extra.userId || null);
+    const username = user ? user.username : (extra.username || 'anon');
+    const role = user ? user.role : (extra.role || 'guest');
+    const gpsLat = extra.lat != null && !isNaN(Number(extra.lat)) ? Number(extra.lat) : null;
+    const gpsLng = extra.lng != null && !isNaN(Number(extra.lng)) ? Number(extra.lng) : null;
+    const gpsAcc = extra.acc != null && !isNaN(Number(extra.acc)) ? Number(extra.acc) : null;
+    const meta = extra.metadata ? (typeof extra.metadata === 'string' ? extra.metadata : JSON.stringify(extra.metadata)) : null;
+
+    db.prepare(`
+      INSERT INTO audit_logs (user_id, username, role, action, category, description, ip, user_agent, device_info, gps_lat, gps_lng, gps_acc, metadata, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId, username, role, action, category, description,
+      ip, ua, deviceInfo, gpsLat, gpsLng, gpsAcc, meta, Date.now()
+    );
+  } catch (err) {
+    console.error('[Audit Error]', err);
+  }
+}
+
+// ============================================================================
+// BACKUP & RECOVERY ENGINE (Automatic Weekly + Manual Snapshots)
+// ============================================================================
+const BACKUP_DIR = path.join(DATA, 'backups');
+fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+function generateBackupData(trigger = 'manual', user = null) {
+  const users = db.prepare('SELECT id, username, name, role, pass, active, perm_rev, created_at FROM users').all();
+  const roles = db.prepare('SELECT id, name, tag, icon, badge_class, description, perms, system, created_at FROM roles').all();
+  const records = db.prepare('SELECT coll, id, pid, data, deleted, rev, updated_at, updated_by FROM records').all();
+  const counter = db.prepare('SELECT k, v FROM counter').all();
+  const auditLogs = db.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500').all();
+
+  return {
+    app: 'ZanFin',
+    version: '2.0.0',
+    type: 'full_database_snapshot',
+    trigger,
+    createdBy: user ? user.username : 'system',
+    timestamp: Date.now(),
+    date: new Date().toISOString(),
+    stats: {
+      users: users.length,
+      roles: roles.length,
+      records: records.length,
+      auditLogs: auditLogs.length
+    },
+    data: {
+      users,
+      roles,
+      records,
+      counter,
+      audit_logs: auditLogs
+    }
+  };
+}
+
+function pruneOldBackups() {
+  try {
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith('.json'))
+      .map(f => ({ name: f, time: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.time - a.time);
+
+    if (files.length > 10) {
+      for (let i = 10; i < files.length; i++) {
+        fs.unlinkSync(path.join(BACKUP_DIR, files[i].name));
+      }
+    }
+  } catch (e) {}
+}
+
+function checkAndRunAutoBackup() {
+  try {
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('zanfin-') && f.endsWith('.json'));
+    let latestTime = 0;
+    for (const f of files) {
+      try {
+        const stat = fs.statSync(path.join(BACKUP_DIR, f));
+        if (stat.mtimeMs > latestTime) latestTime = stat.mtimeMs;
+      } catch (e) {}
+    }
+
+    const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
+    const now = Date.now();
+    if (now - latestTime >= SEVEN_DAYS) {
+      const d = new Date();
+      const dateStr = d.toISOString().slice(0, 10);
+      const filename = `zanfin-auto-${dateStr}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.json`;
+      const fullPath = path.join(BACKUP_DIR, filename);
+      const backupData = generateBackupData('auto_weekly', { username: 'SYSTEM_CRON' });
+      fs.writeFileSync(fullPath, JSON.stringify(backupData, null, 2), 'utf-8');
+      console.log(`[ZanFin Backup] Auto backup mingguan berhasil dibuat: ${filename}`);
+
+      recordAudit(null, { id: 0, username: 'SYSTEM_CRON', role: 'system' }, 'AUTO_BACKUP', 'backup', `Sistem otomatis membuat file cadangan mingguan: ${filename}`);
+      pruneOldBackups();
+    }
+  } catch (err) {
+    console.error('[Auto Backup Error]', err);
+  }
+}
+
+// Initial check & interval every 4 hours
+checkAndRunAutoBackup();
+setInterval(checkAndRunAutoBackup, 4 * 3600 * 1000);
+
 function sendJson(res, status, data, headers = {}) {
   const buf = Buffer.from(JSON.stringify(data));
   res.writeHead(status, {
@@ -248,21 +441,38 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse(await readBody(req));
       const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(body.username || '');
       if (!user || !user.active || !verifyPass(body.password || '', user.pass)) {
+        recordAudit(req, null, 'LOGIN_FAILED', 'auth', `Percobaan masuk gagal untuk username: "${body.username || ''}"`, {
+          username: body.username || 'unknown',
+          lat: body.lat,
+          lng: body.lng,
+          acc: body.acc
+        });
         return sendJson(res, 401, { error: 'Username atau password salah' });
       }
       const token = crypto.randomBytes(32).toString('hex');
       const expires = Date.now() + SESSION_DAYS * 86400 * 1000;
       db.prepare('INSERT INTO sessions (token, user_id, expires, created_at) VALUES (?, ?, ?, ?)').run(token, user.id, expires, Date.now());
       const cookie = `zanfin_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`;
+
+      recordAudit(req, user, 'LOGIN', 'auth', `Pengguna ${user.name} (${user.username}) berhasil masuk sebagai ${user.role}`, {
+        lat: body.lat,
+        lng: body.lng,
+        acc: body.acc
+      });
+
       return sendJson(res, 200, {
         user: { id: user.id, username: user.username, name: user.name, role: user.role }
       }, { 'Set-Cookie': cookie });
     }
 
     if (pathname === '/api/logout' && req.method === 'POST') {
+      const user = getSessionUser(req);
       const cookies = parseCookies(req);
       if (cookies.zanfin_session) {
         db.prepare('DELETE FROM sessions WHERE token = ?').run(cookies.zanfin_session);
+      }
+      if (user) {
+        recordAudit(req, user, 'LOGOUT', 'auth', `Pengguna ${user.name} (${user.username}) keluar dari sesi sistem`);
       }
       return sendJson(res, 200, { ok: true }, {
         'Set-Cookie': 'zanfin_session=; Path=/; HttpOnly; Max-Age=0'
@@ -310,6 +520,10 @@ const server = http.createServer(async (req, res) => {
           );
         }
         db.exec('COMMIT');
+        if (pushes.length > 0) {
+          const collSet = [...new Set(pushes.map(p => p.coll))].join(', ');
+          recordAudit(req, user, 'SYNC_SAVE', 'data', `Menyimpan ${pushes.length} pembaruan data (${collSet})`);
+        }
       } catch (e) {
         db.exec('ROLLBACK');
         throw e;
@@ -364,6 +578,7 @@ const server = http.createServer(async (req, res) => {
               name || username, role || 'peneliti', active !== false ? 1 : 0, id
             );
           }
+          recordAudit(req, user, 'USER_UPDATE', 'tim', `Memperbarui akun pengguna "${name || username}" (${role})`);
         } else {
           if (!username || !pass) {
             return sendJson(res, 400, { error: 'Username dan password wajib diisi' });
@@ -373,6 +588,7 @@ const server = http.createServer(async (req, res) => {
             db.prepare('INSERT INTO users (username, name, role, pass, active, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
               username.toLowerCase().trim(), name || username, role || 'peneliti', hash, active !== false ? 1 : 0, Date.now()
             );
+            recordAudit(req, user, 'USER_CREATE', 'tim', `Membuat akun baru "${name || username}" (@${username.toLowerCase().trim()}) role: ${role}`);
           } catch (e) {
             if (e.message && e.message.includes('UNIQUE')) {
               return sendJson(res, 400, { error: 'Username sudah digunakan' });
@@ -392,7 +608,9 @@ const server = http.createServer(async (req, res) => {
         if (!id) return sendJson(res, 400, { error: 'ID user wajib diisi' });
         if (Number(id) === Number(user.id)) return sendJson(res, 400, { error: 'Tidak dapat menghapus akun Anda sendiri yang sedang aktif' });
 
+        const target = db.prepare('SELECT username, name, role FROM users WHERE id = ?').get(id);
         db.prepare('DELETE FROM users WHERE id = ?').run(id);
+        recordAudit(req, user, 'USER_DELETE', 'tim', `Menghapus akun pengguna "${target ? target.name + ' (@' + target.username + ')' : 'ID ' + id}"`);
         const users = db.prepare('SELECT id, username, name, role, active, created_at FROM users ORDER BY id ASC').all();
         return sendJson(res, 200, { ok: true, users });
       }
@@ -447,6 +665,8 @@ const server = http.createServer(async (req, res) => {
           Date.now()
         );
 
+        recordAudit(req, user, 'ROLE_SAVE', 'sistem', `Menyimpan pengaturan peran "${name}" (${cleanId})`);
+
         const rows = db.prepare('SELECT * FROM roles ORDER BY system DESC, created_at ASC').all();
         const roles = rows.map(r => ({
           id: r.id,
@@ -466,11 +686,13 @@ const server = http.createServer(async (req, res) => {
         if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang bisa menghapus peran' });
         const body = JSON.parse(await readBody(req));
         const { id } = body;
-        const role = db.prepare('SELECT system FROM roles WHERE id = ?').get(id);
+        const role = db.prepare('SELECT name, system FROM roles WHERE id = ?').get(id);
         if (!role) return sendJson(res, 404, { error: 'Peran tidak ditemukan' });
         if (role.system) return sendJson(res, 400, { error: 'Peran bawaan sistem tidak boleh dihapus' });
 
         db.prepare('DELETE FROM roles WHERE id = ?').run(id);
+        recordAudit(req, user, 'ROLE_DELETE', 'sistem', `Menghapus peran kustom "${role.name}" (${id})`);
+
         const rows = db.prepare('SELECT * FROM roles ORDER BY system DESC, created_at ASC').all();
         const roles = rows.map(r => ({
           id: r.id,
@@ -483,6 +705,281 @@ const server = http.createServer(async (req, res) => {
           system: Boolean(r.system)
         }));
         return sendJson(res, 200, { ok: true, roles });
+      }
+    }
+
+    // ========================================================================
+    // AUDIT LOGS & SPY SYSTEM ENDPOINTS (SUPERADMIN ONLY)
+    // ========================================================================
+    if (pathname === '/api/audit-logs') {
+      const user = getSessionUser(req);
+      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang berhak melihat Catatan Mata-mata' });
+
+      if (req.method === 'GET') {
+        const search = (parsedUrl.searchParams.get('q') || '').trim();
+        const category = (parsedUrl.searchParams.get('cat') || '').trim();
+        const limit = Math.min(Number(parsedUrl.searchParams.get('limit')) || 100, 300);
+
+        let sql = 'SELECT * FROM audit_logs WHERE 1=1';
+        const params = [];
+
+        if (category && category !== 'all') {
+          sql += ' AND category = ?';
+          params.push(category);
+        }
+
+        if (search) {
+          sql += ' AND (username LIKE ? OR description LIKE ? OR ip LIKE ? OR device_info LIKE ? OR action LIKE ?)';
+          const s = `%${search}%`;
+          params.push(s, s, s, s, s);
+        }
+
+        sql += ' ORDER BY created_at DESC LIMIT ?';
+        params.push(limit);
+
+        const logs = db.prepare(sql).all(...params);
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayCount = db.prepare('SELECT COUNT(*) as c FROM audit_logs WHERE created_at >= ?').get(todayStart.getTime()).c;
+        const failedCount = db.prepare("SELECT COUNT(*) as c FROM audit_logs WHERE action = 'LOGIN_FAILED' AND created_at >= ?").get(todayStart.getTime()).c;
+        const totalCount = db.prepare('SELECT COUNT(*) as c FROM audit_logs').get().c;
+
+        return sendJson(res, 200, {
+          ok: true,
+          logs,
+          stats: {
+            today: todayCount,
+            failedToday: failedCount,
+            total: totalCount
+          }
+        });
+      }
+
+      if (req.method === 'DELETE') {
+        const body = JSON.parse(await readBody(req));
+        if (body.all) {
+          db.exec('DELETE FROM audit_logs');
+          recordAudit(req, user, 'LOGS_CLEARED', 'keamanan', 'Superadmin menghapus seluruh riwayat catatan audit');
+        } else if (body.olderThanDays) {
+          const cutoff = Date.now() - (Number(body.olderThanDays) * 86400 * 1000);
+          db.prepare('DELETE FROM audit_logs WHERE created_at < ?').run(cutoff);
+          recordAudit(req, user, 'LOGS_PURGED', 'keamanan', `Superadmin membersihkan log yang lebih lama dari ${body.olderThanDays} hari`);
+        }
+        return sendJson(res, 200, { ok: true });
+      }
+    }
+
+    if (pathname === '/api/audit/ping' && req.method === 'POST') {
+      const user = getSessionUser(req);
+      if (!user) return sendJson(res, 401, { error: 'Unauthorized' });
+      const body = JSON.parse(await readBody(req));
+      if (body.lat != null && body.lng != null) {
+        recordAudit(req, user, 'GPS_PING', 'lokasi', `Pembaruan lokasi GPS perangkat: ${Number(body.lat).toFixed(5)}, ${Number(body.lng).toFixed(5)} (±${body.acc || 0}m)`, {
+          lat: body.lat,
+          lng: body.lng,
+          acc: body.acc
+        });
+      }
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (pathname === '/api/audit/log' && req.method === 'POST') {
+      const user = getSessionUser(req);
+      if (!user) return sendJson(res, 401, { error: 'Unauthorized' });
+      const body = JSON.parse(await readBody(req));
+      recordAudit(req, user, body.action || 'ACTIVITY', body.category || 'umum', body.description || 'Aktivitas pengguna', {
+        lat: body.lat,
+        lng: body.lng,
+        acc: body.acc,
+        metadata: body.metadata
+      });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // ========================================================================
+    // BACKUP & RESTORE SYSTEM ENDPOINTS (SUPERADMIN ONLY)
+    // ========================================================================
+    if (pathname === '/api/backup/status' && req.method === 'GET') {
+      const user = getSessionUser(req);
+      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Forbidden' });
+
+      let backupFiles = [];
+      try {
+        backupFiles = fs.readdirSync(BACKUP_DIR)
+          .filter(f => f.endsWith('.json'))
+          .map(f => {
+            const st = fs.statSync(path.join(BACKUP_DIR, f));
+            return {
+              name: f,
+              size: st.size,
+              date: st.mtime.toISOString(),
+              mtimeMs: st.mtimeMs,
+              isAuto: f.includes('-auto-')
+            };
+          })
+          .sort((a, b) => b.mtimeMs - a.mtimeMs);
+      } catch (e) {}
+
+      const latestBackup = backupFiles.length > 0 ? backupFiles[0] : null;
+      const lastBackupTime = latestBackup ? latestBackup.mtimeMs : 0;
+      const daysSinceLastBackup = latestBackup ? Math.floor((Date.now() - latestBackup.mtimeMs) / (24 * 3600 * 1000)) : 999;
+      const needsBackup = daysSinceLastBackup >= 7;
+
+      const totalRecords = db.prepare('SELECT COUNT(*) as c FROM records WHERE deleted = 0').get().c;
+      const totalUsers = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
+      const totalAuditLogs = db.prepare('SELECT COUNT(*) as c FROM audit_logs').get().c;
+
+      return sendJson(res, 200, {
+        ok: true,
+        lastBackupTime,
+        daysSinceLastBackup,
+        needsBackup,
+        totalRecords,
+        totalUsers,
+        totalAuditLogs,
+        backupFiles
+      });
+    }
+
+    if (pathname === '/api/backup/download' && req.method === 'GET') {
+      const user = getSessionUser(req);
+      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Forbidden' });
+
+      // Downloading specific file from backup history
+      if (parsedUrl.searchParams.has('file')) {
+        const reqFile = path.basename(parsedUrl.searchParams.get('file'));
+        const targetPath = path.join(BACKUP_DIR, reqFile);
+        if (fs.existsSync(targetPath)) {
+          const content = fs.readFileSync(targetPath);
+          recordAudit(req, user, 'BACKUP_DOWNLOAD', 'backup', `Superadmin mengunduh file cadangan historis: ${reqFile}`);
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${reqFile}"`,
+            'Content-Length': content.length
+          });
+          return res.end(content);
+        } else {
+          return sendJson(res, 404, { error: 'File cadangan tidak ditemukan' });
+        }
+      }
+
+      // Generate live on-demand snapshot
+      const backupData = generateBackupData('manual_download', user);
+      const d = new Date();
+      const dateStr = d.toISOString().slice(0, 10);
+      const filename = `zanfin-backup-${dateStr}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.json`;
+      
+      // Save local copy in backups directory
+      fs.writeFileSync(path.join(BACKUP_DIR, filename), JSON.stringify(backupData, null, 2), 'utf-8');
+      pruneOldBackups();
+
+      recordAudit(req, user, 'BACKUP_DOWNLOAD', 'backup', `Superadmin mengunduh snapshot cadangan database: ${filename}`);
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const buf = Buffer.from(jsonStr, 'utf-8');
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': buf.length
+      });
+      return res.end(buf);
+    }
+
+    if (pathname === '/api/backup/restore' && req.method === 'POST') {
+      const user = getSessionUser(req);
+      if (!user || user.role !== 'superadmin') return sendJson(res, 403, { error: 'Hanya Super Admin yang berhak memulihkan data' });
+
+      const raw = await readBody(req);
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Format file tidak valid (harus file JSON backup ZanFin)' });
+      }
+
+      if (!payload || payload.app !== 'ZanFin' || !payload.data) {
+        return sendJson(res, 400, { error: 'File bukan cadangan data resmi ZanFin yang valid' });
+      }
+
+      const { users, roles, records, counter } = payload.data;
+      if (!Array.isArray(records) || !Array.isArray(users)) {
+        return sendJson(res, 400, { error: 'Struktur data cadangan rusak atau tidak lengkap' });
+      }
+
+      // Safety snapshot of current database state before restoration
+      const safetyFile = `zanfin-pre-restore-${Date.now()}.json`;
+      const safetyData = generateBackupData('safety_before_restore', user);
+      fs.writeFileSync(path.join(BACKUP_DIR, safetyFile), JSON.stringify(safetyData, null, 2), 'utf-8');
+
+      // Atomic restoration inside SQLite transaction
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        if (Array.isArray(roles) && roles.length > 0) {
+          db.exec('DELETE FROM roles');
+          const insRole = db.prepare(`
+            INSERT INTO roles (id, name, tag, icon, badge_class, description, perms, system, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const r of roles) {
+            insRole.run(
+              r.id, r.name, r.tag || r.name, r.icon || '📋', r.badge_class || 'info',
+              r.description || '', typeof r.perms === 'string' ? r.perms : JSON.stringify(r.perms || {}),
+              r.system ? 1 : 0, r.created_at || Date.now()
+            );
+          }
+        }
+
+        db.exec('DELETE FROM records');
+        const insRec = db.prepare(`
+          INSERT INTO records (coll, id, pid, data, deleted, rev, updated_at, updated_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const r of records) {
+          insRec.run(
+            r.coll, r.id, r.pid || null,
+            typeof r.data === 'string' ? r.data : JSON.stringify(r.data || {}),
+            r.deleted ? 1 : 0, r.rev || 1, r.updated_at || Date.now(), r.updated_by || user.id
+          );
+        }
+
+        if (Array.isArray(users) && users.length > 0) {
+          db.exec('DELETE FROM users');
+          const insUser = db.prepare(`
+            INSERT INTO users (id, username, name, role, pass, active, perm_rev, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const u of users) {
+            insUser.run(u.id, u.username, u.name, u.role, u.pass, u.active !== 0 ? 1 : 0, u.perm_rev || 1, u.created_at || Date.now());
+          }
+        }
+
+        if (Array.isArray(counter)) {
+          for (const c of counter) {
+            db.prepare(`
+              INSERT INTO counter (k, v) VALUES (?, ?)
+              ON CONFLICT(k) DO UPDATE SET v = excluded.v
+            `).run(c.k, c.v);
+          }
+        }
+
+        db.exec('COMMIT');
+
+        recordAudit(req, user, 'RESTORE_SUCCESS', 'backup', `Database berhasil dipulihkan dari file cadangan tanggal ${payload.date || 'tidak diketahui'}. Berisi ${records.length} data, ${users.length} pengguna.`);
+
+        return sendJson(res, 200, {
+          ok: true,
+          message: 'Database berhasil dipulihkan sepenuhnya!',
+          restored: {
+            records: records.length,
+            users: users.length,
+            roles: roles?.length || 0
+          }
+        });
+      } catch (err) {
+        db.exec('ROLLBACK');
+        console.error('[Restore Error]', err);
+        return sendJson(res, 500, { error: 'Gagal memulihkan database: ' + err.message });
       }
     }
 
