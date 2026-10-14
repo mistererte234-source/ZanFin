@@ -1,9 +1,10 @@
 /* ZanFin service worker — app shell cache + graceful update.
    Build n Code by zandev.id */
-const VERSION = 'zanfin-v2.7.0';
+const VERSION = 'zanfin-v2.8.0';
 const SHELL = [
   './',
   './index.html',
+  './og-image.png',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
