@@ -3604,6 +3604,14 @@ function vLainnya() {
         '</div>' +
         '<div class="r">›</div>' +
       '</button>' +
+      '<button class="it" onclick="window.open(\'./docs/Buku_Panduan_ZanFin_Admin_Ketua_Bendahara.pdf\', \'_blank\')">' +
+        '<div class="avatar" style="color:var(--helm);background:rgba(14,165,233,0.12)">📖</div>' +
+        '<div class="t">' +
+          '<b>Buku Panduan Pengguna (PDF)</b>' +
+          '<span>Manual book Admin, Ketua &amp; Bendahara lengkap gambar</span>' +
+        '</div>' +
+        '<div class="r"><span class="pill info" style="font-size:10px;padding:2px 8px">Unduh PDF</span></div>' +
+      '</button>' +
       '<button class="it" onclick="go(null, \'akun\')">' +
         renderAvatar(ME || { name: curRole.name, role: CURRENT_ROLE }, 40) +
         '<div class="t" style="margin-left:8px">' +
@@ -4995,6 +5003,16 @@ function vAkun() {
         '<span>Tampilkan karakter password</span>' +
       '</label>' +
       '<button class="btn pri block" onclick="doChangePassword()">Perbarui Password Akun</button>' +
+    '</div>' +
+
+    /* Buku Panduan Manual Book */
+    '<div class="card stack" style="gap:10px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(99,102,241,0.08));border:1px solid rgba(14,165,233,0.3)">' +
+      '<div class="row" style="gap:8px;align-items:center">' +
+        '<span style="font-size:20px">📖</span>' +
+        '<h3 style="margin:0;color:var(--helm)">Buku Panduan Pengguna (PDF)</h3>' +
+      '</div>' +
+      '<p class="small muted" style="margin:0">Pedoman operasional lengkap untuk Admin, Ketua Peneliti &amp; Bendahara Proyek dengan tangkapan layar, SOP belanja &amp; panduan e-Bupot DJP.</p>' +
+      '<button class="btn ok block" onclick="window.open(\'./docs/Buku_Panduan_ZanFin_Admin_Ketua_Bendahara.pdf\', \'_blank\')">📥 Buka / Unduh Manual Book (PDF)</button>' +
     '</div>' +
 
     /* Status Server & Sesi */
