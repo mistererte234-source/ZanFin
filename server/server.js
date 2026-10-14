@@ -88,15 +88,24 @@ function verifyPass(pwd, stored) {
   return crypto.timingSafeEqual(Buffer.from(key, 'hex'), buf);
 }
 
-// Ensure default superadmin if no users exist
-const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
-if (userCount === 0) {
-  const hash = hashPass('admin123');
-  db.prepare(`
-    INSERT INTO users (username, name, role, pass, active, created_at)
-    VALUES ('admin', 'Astro Administrator', 'superadmin', ?, 1, ?)
-  `).run(hash, Date.now());
-  console.log('[ZanFin] Akun superadmin default dibuat: username "admin", password "admin123"');
+// Ensure default role accounts exist (Superadmin, Ketua, Bendahara, Peneliti)
+const defaultSeedUsers = [
+  { username: 'admin', name: 'Astro Administrator', role: 'superadmin', pass: 'admin123' },
+  { username: 'ketua', name: 'Dr. Ir. Hj. Nadhiroh, M.Kes', role: 'ketua', pass: 'ketua123' },
+  { username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', pass: 'bendahara123' },
+  { username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', pass: 'peneliti123' }
+];
+
+for (const u of defaultSeedUsers) {
+  const existing = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(u.username);
+  if (!existing) {
+    const hash = hashPass(u.pass);
+    db.prepare(`
+      INSERT INTO users (username, name, role, pass, active, created_at)
+      VALUES (?, ?, ?, ?, 1, ?)
+    `).run(u.username, u.name, u.role, hash, Date.now());
+    console.log(`[ZanFin] Akun default dibuat: ${u.username} (${u.role}), pass: ${u.pass}`);
+  }
 }
 
 function parseCookies(req) {
