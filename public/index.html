@@ -914,7 +914,7 @@ button.card { text-align: left; cursor: pointer; width: 100%; }
  * Build n Code by zandev.id
  */
 
-const KEY = 'zanfin_state_v3';
+const KEY = 'zanfin_state_v4';
 const THEME_KEY = 'zanfin_theme';
 
 const SVG = {
@@ -1341,6 +1341,60 @@ function getRealResearchSeed() {
       {
         id: 'tx_hr_4',
         pid: pid,
+        date: '2026-08-28',
+        ts: 1756350000000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 855000,
+        gross: 900000,
+        tax_pph21: 45000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Workshop nLCA & Assessmen Resiliensi UNDRR - HR Narasumber 1 (Iman Maulana, S.T.)',
+        ref: 'KWT-HR-039',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_5',
+        pid: pid,
+        date: '2026-09-18',
+        ts: 1758160800000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 855000,
+        gross: 900000,
+        tax_pph21: 45000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Diseminasi Hasil Riset Gresik - HR Narasumber (Ahmad Fathony Maulidy, S.T., M.T.)',
+        ref: 'KWT-HR-044A',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_6',
+        pid: pid,
+        date: '2026-09-20',
+        ts: 1758333600000,
+        dir: 'out',
+        cat: 'honor',
+        amount: 855000,
+        gross: 900000,
+        tax_pph21: 45000,
+        tax_pph22: 0,
+        tax_pph23: 0,
+        tax_ppn: 0,
+        note: 'Diseminasi Hasil Riset Batu - HR Narasumber (Lestari Aji, S.Pi, M.A.Gr)',
+        ref: 'KWT-HR-044B',
+        spj_ok: true,
+        void: false
+      },
+      {
+        id: 'tx_hr_7',
+        pid: pid,
         date: '2026-08-30',
         ts: 1756519200000,
         dir: 'out',
@@ -1351,7 +1405,7 @@ function getRealResearchSeed() {
         tax_pph22: 0,
         tax_pph23: 0,
         tax_ppn: 0,
-        note: 'Honor Petugas Survei Lapangan Rumah Tangga (160 responden @ Rp 8.000)',
+        note: 'Honor Petugas Survei Lapangan RT (8 Enumerator x 20 RT = 160 responden @ Rp 8.000)',
         ref: 'KWT-HR-056',
         spj_ok: true,
         void: false
@@ -1618,16 +1672,166 @@ function getRealResearchSeed() {
       {
         id: 'pay_4',
         pid: pid,
+        wid: 'w_6',
+        date: '2026-08-28',
+        ts: 1756350000000,
+        period: 'Workshop UNDRR Scorecard (Agustus 2026)',
+        gross: 900000,
+        tax_rate: 0.05,
+        tax_amt: 45000,
+        netto: 855000,
+        ref: 'KWT-HR-039',
+        note: 'Honorarium Narasumber Workshop Scorecard UNDRR (Iman Maulana, S.T.)',
+        paid: true
+      },
+      {
+        id: 'pay_5',
+        pid: pid,
+        wid: 'w_4',
+        date: '2026-09-18',
+        ts: 1758160800000,
+        period: 'Diseminasi Hasil Riset Gresik (September 2026)',
+        gross: 900000,
+        tax_rate: 0.05,
+        tax_amt: 45000,
+        netto: 855000,
+        ref: 'KWT-HR-044A',
+        note: 'Honorarium Narasumber Diseminasi Hasil Gresik (Ahmad Fathony M.)',
+        paid: true
+      },
+      {
+        id: 'pay_6',
+        pid: pid,
+        wid: 'w_5',
+        date: '2026-09-20',
+        ts: 1758333600000,
+        period: 'Diseminasi Hasil Riset Batu (September 2026)',
+        gross: 900000,
+        tax_rate: 0.05,
+        tax_amt: 45000,
+        netto: 855000,
+        ref: 'KWT-HR-044B',
+        note: 'Honorarium Narasumber Diseminasi Hasil Batu (Lestari Aji, S.Pi)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_1',
+        pid: pid,
         wid: 'w_9',
         date: '2026-08-30',
-        ts: 1756519200000,
-        period: 'Survei Rumah Tangga Lapangan (Agustus 2026)',
-        gross: 1280000,
+        ts: 1756519200001,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
         tax_rate: 0.05,
-        tax_amt: 64000,
-        netto: 1216000,
-        ref: 'KWT-HR-056',
-        note: 'Honor Petugas Survei Lapangan 160 responden RT',
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-1',
+        note: 'Honor Petugas Survei RT (Ratu Dien Prima Fermeza., S.Gz.)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_2',
+        pid: pid,
+        wid: 'w_10',
+        date: '2026-08-30',
+        ts: 1756519200002,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-2',
+        note: 'Honor Petugas Survei RT (Kayla Auraline Erlawan, S.Gz.)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_3',
+        pid: pid,
+        wid: 'w_11',
+        date: '2026-08-30',
+        ts: 1756519200003,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-3',
+        note: 'Honor Petugas Survei RT (Nafiisah Zana Dzakiyyah, S.Gz.)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_4',
+        pid: pid,
+        wid: 'w_12',
+        date: '2026-08-30',
+        ts: 1756519200004,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-4',
+        note: 'Honor Petugas Survei RT (Salma Violita Pradana, S.Gz)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_5',
+        pid: pid,
+        wid: 'w_13',
+        date: '2026-08-30',
+        ts: 1756519200005,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-5',
+        note: 'Honor Petugas Survei RT (Melanie Putri Anggraini, S.Gz)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_6',
+        pid: pid,
+        wid: 'w_14',
+        date: '2026-08-30',
+        ts: 1756519200006,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-6',
+        note: 'Honor Petugas Survei RT (Maulidina Maiyarani Amroe, S.Gz)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_7',
+        pid: pid,
+        wid: 'w_15',
+        date: '2026-08-30',
+        ts: 1756519200007,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-7',
+        note: 'Honor Petugas Survei RT (Layyina Azka Nabila, S.Gz.)',
+        paid: true
+      },
+      {
+        id: 'pay_enum_8',
+        pid: pid,
+        wid: 'w_16',
+        date: '2026-08-30',
+        ts: 1756519200008,
+        period: 'Survei RT Gresik & Batu (20 RT)',
+        gross: 160000,
+        tax_rate: 0.05,
+        tax_amt: 8000,
+        netto: 152000,
+        ref: 'KWT-HR-056-8',
+        note: 'Honor Petugas Survei RT (Wichdah Layn Al’aqilah, S.Gz.)',
         paid: true
       }
     ],
@@ -1867,9 +2071,10 @@ function loadState() {
     console.error('Failed to load local state', e);
   }
 
-  // If v3 does not exist or empty, purge legacy dirty dummy cache & initialize with authentic RAB seed
-  if (!loaded || !S || !S.projects || !S.projects.length) {
+  // If v4 does not exist or has incomplete payroll (< 8 slips), purge legacy cache & load full 14 slips
+  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 8) {
     try {
+      localStorage.removeItem('zanfin_state_v3');
       localStorage.removeItem('zanfin_state_v2');
       localStorage.removeItem('zanfin_state_v1');
       localStorage.removeItem('zanfin_state');
