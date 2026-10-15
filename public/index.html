@@ -914,7 +914,7 @@ button.card { text-align: left; cursor: pointer; width: 100%; }
  * Build n Code by zandev.id
  */
 
-const KEY = 'zanfin_state_v5';
+const KEY = 'zanfin_state_v6';
 const THEME_KEY = 'zanfin_theme';
 
 const SVG = {
@@ -2071,9 +2071,10 @@ function loadState() {
     console.error('Failed to load local state', e);
   }
 
-  // If v5 does not exist or has incomplete payroll (< 14 slips) or old enumerator rate (< 1.280.000), purge legacy cache & load full seed
-  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 14 || S.payrolls.some(p => p.id === 'pay_enum_1' && p.gross < 1280000)) {
+  // If v6 does not exist or has incomplete payroll (< 14 slips) or old enumerator rate (< 1.280.000) or old tax rates, purge legacy cache & load full seed
+  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 14 || S.payrolls.some(p => p.id === 'pay_enum_1' && (p.gross < 1280000 || p.tax_amt > 6400))) {
     try {
+      localStorage.removeItem('zanfin_state_v5');
       localStorage.removeItem('zanfin_state_v4');
       localStorage.removeItem('zanfin_state_v3');
       localStorage.removeItem('zanfin_state_v2');
@@ -2165,6 +2166,26 @@ function sanitizeAllData() {
       if (p.note && FAKE_TITLE_SNIPPETS.some(f => p.note.includes(f))) {
         p.note = p.note.replace(/Dr\.\s*Ir\.\s*Hj\.\s*Nadhiroh,?\s*M\.Kes/gi, REAL_LEADER)
                        .replace(/Dr\.\s*Ir\.\s*Hj\./gi, 'Dr.');
+        migrated = true;
+      }
+
+      // Auto-align with official Coretax DJP tax rules (Rp 202.200 total)
+      if (p.id && p.id.startsWith('pay_enum') && p.tax_amt > 6400) {
+        p.tax_rate = 0.005;
+        p.tax_amt = 6400;
+        p.netto = p.gross - p.tax_amt;
+        migrated = true;
+      }
+      if ((p.id === 'pay_1' || p.id === 'pay_2' || p.id === 'pay_4' || p.id === 'pay_5' || p.id === 'pay_6') && p.tax_amt > 22500) {
+        p.tax_rate = 0.05;
+        p.tax_amt = 22500;
+        p.netto = p.gross - p.tax_amt;
+        migrated = true;
+      }
+      if (p.id === 'pay_3' && p.tax_amt > 38500) {
+        p.tax_rate = 0.05;
+        p.tax_amt = 38500;
+        p.netto = p.gross - p.tax_amt;
         migrated = true;
       }
     }
