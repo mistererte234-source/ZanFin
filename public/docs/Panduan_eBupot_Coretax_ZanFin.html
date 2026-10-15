@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Panduan Pengisian e-Bupot 21/26 Coretax DJP — Riset Bu Nadhiroh</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm 14mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 9.8pt;
+    line-height: 1.55;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    page-break-after: always;
+    position: relative;
+    padding-bottom: 10px;
+  }
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  /* Cover Styles */
+  .cover {
+    height: 100%;
+    min-height: 255mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #0369a1 100%);
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 42px 38px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover::before {
+    content: "";
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0) 70%);
+    border-radius: 50%;
+  }
+
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #38bdf8;
+  }
+
+  .cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    line-height: 1.22;
+    margin: 24px 0 14px;
+    letter-spacing: -0.5px;
+  }
+
+  .cover-subtitle {
+    font-size: 12.5pt;
+    color: #cbd5e1;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
+  .cover-meta {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 28px 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .meta-item .label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    color: #94a3b8;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .meta-item .val {
+    font-size: 10pt;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .cover-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 20px;
+    font-size: 8.5pt;
+    color: #94a3b8;
+  }
+
+  .cover-footer a {
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  /* Section & Typography */
+  h1 {
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.3px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #0284c7;
+    padding-bottom: 6px;
+  }
+
+  h2 {
+    font-size: 13pt;
+    font-weight: 750;
+    color: #0369a1;
+    margin: 18px 0 8px;
+  }
+
+  h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 12px 0 4px;
+  }
+
+  p {
+    margin-bottom: 10px;
+    color: #334155;
+  }
+
+  /* Cards & Callouts */
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+
+  .callout-blue {
+    background: #f0f9ff;
+    border-left: 4.5px solid #0284c7;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+  }
+
+  .callout-amber {
+    background: #fffbeb;
+    border-left: 4.5px solid #f59e0b;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+  }
+
+  .callout-green {
+    background: #f0fdf4;
+    border-left: 4.5px solid #16a34a;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+  }
+
+  /* Steps Workflow */
+  .step-box {
+    display: flex;
+    gap: 14px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    background: #0284c7;
+    color: #ffffff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 11pt;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-content b {
+    color: #0f172a;
+    font-size: 10.2pt;
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  /* Table Design */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 8.5pt;
+  }
+
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+  }
+
+  td {
+    padding: 7px 9px;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+  }
+
+  tr:nth-child(even) {
+    background: #f8fafc;
+  }
+
+  .tar { text-align: right; }
+  .tac { text-align: center; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 7.5pt;
+    font-weight: 700;
+  }
+  .pill-blue { background: #e0f2fe; color: #0369a1; }
+  .pill-green { background: #dcfce7; color: #15803d; }
+  .pill-amber { background: #fef3c7; color: #b45309; }
+
+  .footer-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+    font-size: 8pt;
+    color: #94a3b8;
+  }
+  .footer-bar a {
+    color: #0284c7;
+    text-decoration: none;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<!-- HALAMAN 1: COVER -->
+<div class="page">
+  <div class="cover">
+    <div>
+      <div class="cover-badge">
+        <span>🏛️ Modul Panduan Resmi Coretax DJP &amp; SPJ Riset</span>
+      </div>
+      <div class="cover-title">
+        Panduan Praktis Pengisian e-Bupot 21/26 Coretax DJP &amp; Pertanggungjawaban SPJ
+      </div>
+      <div class="cover-subtitle">
+        Alur pelaporan pemotongan pajak PPh 21 honorarium tim peneliti, narasumber FGD, pengolah data, dan 8 orang petugas survei lapangan sesuai dokumen otentik RAB Riset Bu Nadhiroh.
+      </div>
+    </div>
+
+    <div>
+      <div class="cover-meta">
+        <div class="meta-item">
+          <div class="label">Judul Proyek Penelitian</div>
+          <div class="val">Riset Resiliensi Pangan &amp; Gizi Masyarakat (Gresik &amp; Batu)</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Ketua Peneliti (Penerima Hibah)</div>
+          <div class="val">Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Institusi Penyelenggara</div>
+          <div class="val">Fakultas Kesehatan Masyarakat, Universitas Airlangga</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Skema Pendanaan &amp; Tahun Anggaran</div>
+          <div class="val">Kemendikbudristek PTUPT · Tahun 2026 (Pagu Rp 120 Juta)</div>
+        </div>
+      </div>
+
+      <div class="cover-footer">
+        <div>ZanFin FinTax Intelligence System · 2026</div>
+        <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HALAMAN 2: BAB 1 & 2: SIAPA YANG INPUT & ALUR e-BUPOT -->
+<div class="page" style="padding-top: 10px;">
+  <h1>Bab 1: Wewenang Pajak &amp; Alur Kerja di e-Bupot 21/26</h1>
+
+  <p>
+    Dalam tata kelola keuangan dana hibah penelitian perguruan tinggi (Kemendikbudristek / DRTPM), pemotongan dan pelaporan pajak penghasilan Pasal 21 (PPh 21) atas honorarium diatur secara terstruktur antara <b>Ketua Peneliti</b>, <b>Bendahara Proyek</b>, dan <b>Bendahara Pengeluaran / Operator Pajak LPPM Unair</b>.
+  </p>
+
+  <div class="callout-blue">
+    <h3 style="color:#0369a1;margin:0 0 4px">💡 Siapa yang Sebenarnya Menginput Pajak ke Akun DJP Online?</h3>
+    <p style="margin:0;font-size:9pt;line-height:1.5">
+      <b>Ketua Peneliti</b> adalah penanggung jawab sah akademik dan keuangan riset. Dalam pelaksanaannya, input ke aplikasi <b>e-Bupot 21/26 DJP Online / Coretax</b> dilakukan menggunakan akun NPWP Pemotong Pajak (biasanya akun resmi <b>Universitas / LPPM UNAIR</b> oleh Operator Pajak Kampus, ATAU oleh <b>Bendahara Proyek</b> yang didelegasikan wewenang akses).<br>
+      Aplikasi <b>ZanFin</b> bertindak sebagai sumber data primer yang menyiapkan seluruh berkas nominatif, NIK 16 digit terverifikasi, perhitungan tarif, nomor kuitansi, dan file ekspor CSV siap impor.
+    </p>
+  </div>
+
+  <h2>Bab 2: Dua Pilihan Cara Pengisian di e-Bupot Coretax DJP</h2>
+
+  <div class="step-box">
+    <div class="step-num">A</div>
+    <div class="step-content">
+      <b>Metode 1: Ekspor Impor Massal CSV Coretax (Sangat Cepat - Sekali Klik)</b>
+      <p style="margin:0;font-size:9.2pt;color:#475569">
+        Ketua / Bendahara tidak perlu mengetik satu per satu di web DJP. Cukup klik tombol <b>"Ekspor CSV Coretax DJP"</b> di menu <i>Pajak &amp; Coretax</i> pada ZanFin. File CSV yang dihasilkan sudah berisi data 14 penerima honor. Buka DJP Online &rarr; Menu <b>e-Bupot 21/26 &rarr; Impor Data Bukti Potong &rarr; Upload CSV</b>. Dalam 5 detik, ke-14 Bukti Potong otomatis terbit serentak!
+      </p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">B</div>
+    <div class="step-content">
+      <b>Metode 2: Perekaman Manual Satu per Satu (Key-In Formulir Web DJP)</b>
+      <p style="margin:0;font-size:9.2pt;color:#475569">
+        Bila operator pajak memilih input manual satu per satu, gunakan data ringkas dari kartu slip honor ZanFin dengan urutan 5 langkah perekaman resmi di bawah ini.
+      </p>
+    </div>
+  </div>
+
+  <h2>Langkah Demi Langkah Perekaman Formulir Bukti Potong (BP21):</h2>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <b>Login ke DJP Online &amp; Masuk Menu e-Bupot 21/26</b>
+      Akses <code>djponline.pajak.go.id</code> dengan NPWP/EFIN Pemotong Pajak. Masuk ke tab <b>e-Bupot 21/26</b> &rarr; pilih <b>Daftar Bukti Potong 21/26</b> &rarr; klik tombol <b>+ Rekam Bukti Potong (BP21)</b>.
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <b>Identitas Wajib Pajak Penerima Penghasilan</b>
+      Pilih opsi identitas <b>NIK (16 Digit Sesuai KTP)</b> atau NPWP. Masukkan nomor NIK yang tertera di ZanFin. Klik tombol <i>Cek NIK</i>; sistem Coretax DJP akan otomatis memverifikasi nama penerima langsung dari server Dukcapil Kemendagri.
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <b>Pemilihan Kode Objek Pajak (KOP)</b>
+      Pilih kode objek pajak yang tepat sesuai RAB:
+      <ul style="margin:4px 0 0 16px;font-size:9pt;color:#334155">
+        <li><b>21-100-09</b> (Imbalan Bukan Pegawai - Tidak Berkesinambungan): Untuk <b>Narasumber FGD, Workshop, Diseminasi, &amp; Pengolah Data</b>.</li>
+        <li><b>21-100-02</b> (Pegawai Tidak Tetap / Tenaga Kerja Lepas): Untuk <b>8 Petugas Survei Lapangan (Enumerator RT)</b>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div>ZanFin Coretax Tax Guide · Halaman 2</div>
+    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+  </div>
+</div>
+
+<!-- HALAMAN 3: DASAR PEMOTONGAN VS BUKTI FISIK & SPJ -->
+<div class="page" style="padding-top: 10px;">
+  <h1>Bab 3: Mengisi Dasar Pemotongan &amp; Dokumen Bukti Bayar</h1>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <b>Input Nilai Dasar Pengenaan Pajak (DPP) &amp; Tarif</b>
+      Masukkan nilai <b>Penghasilan Bruto</b> sesuai slip ZanFin (misal: <code>Rp 1.280.000</code> untuk enumerator atau <code>Rp 900.000</code> untuk narasumber).<br>
+      Sistem e-Bupot akan otomatis mengenakan tarif <b>5%</b> dan menampilkan nilai <b>PPh Pasal 21 Dipotong</b> (misal: <code>Rp 64.000</code> atau <code>Rp 45.000</code>).
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <b>Bagian Dokumen Dasar Pemotongan (Kunci Kuitansi)</b>
+      Di bagian bawah formulir e-Bupot terdapat isian <b>Dokumen Referensi / Dasar Pemotongan</b>:
+      <table style="margin-top:6px">
+        <tr><td style="width:30%"><b>Nama Dokumen</b></td><td>Pilih: <b>Kuitansi / Bukti Pembayaran / Surat Keputusan</b></td></tr>
+        <tr><td><b>Nomor Dokumen</b></td><td>Diisi Nomor Referensi ZanFin (misal: <code>KWT-HR-056-1</code>, <code>KWT-HR-017</code>, dst.)</td></tr>
+        <tr><td><b>Tanggal Dokumen</b></td><td>Diisi Tanggal Kuitansi ZanFin (misal: <code>30/08/2026</code> atau <code>21/08/2026</code>)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="callout-amber">
+    <h3 style="color:#b45309;margin:0 0 6px">⚠️ Pertanyaan Kritis: "Bagaimana dengan Upload Bukti Bayar (Kwitansi) di e-Bupot?"</h3>
+    <p style="margin:0;font-size:9.2pt;line-height:1.55;color:#78350f">
+      <b>Fakta Teknis DJP Online:</b> Sistem e-Bupot 21/26 <b>TIDAK meminta pengguna meng-upload file scan foto/PDF kuitansi</b> ke server DJP saat menerbitkan bukti potong. Yang diwajibkan oleh DJP hanyalah mencatat <b>Nomor Dokumen &amp; Tanggal Dokumen</b> sebagai referensi hukum.<br><br>
+      <b>Lalu kemana bukti kuitansi &amp; slip gaji harus di-upload / disimpan?</b><br>
+      File foto transfer m-banking, slip gaji bertanda tangan basah, dan kuitansi bermaterai adalah <b>berkas wajib Laporan Pertanggungjawaban (SPJ/LPJ Hibah Riset)</b> untuk universitas (LPPM UNAIR) dan Kemendikbudristek (Sistem BIMA). Di ZanFin, fitur <i>Unggah Bukti Transfer / Nota</i> sudah tersedia di setiap slip honor sehingga Anda memiliki arsip digital yang rapi dan siap cetak sewaktu diperiksa auditor BPK / Inspektorat.
+    </p>
+  </div>
+
+  <h2>Alur Integrasi ZanFin ke e-Bupot &amp; SPJ Universitas:</h2>
+  <div class="card" style="line-height:1.6;font-size:9.2pt">
+    <b>1. Buat &amp; Validasi Slip di ZanFin:</b> Setiap honor dibuatkan kuitansi dan dilampirkan struk transfer / nota.<br>
+    <b>2. Ekspor File Coretax CSV:</b> Klik satu tombol di menu <i>Pajak &amp; Coretax</i> untuk mengunduh tabel siap impor.<br>
+    <b>3. Terbitkan Bukti Potong 1721-VIII:</b> Di e-Bupot DJP Online, cetak formulir Bukti Potong PPh 21 resmi (ber-barcode DJP).<br>
+    <b>4. Satukan Berkas SPJ:</b> Pasangkan Bukti Potong DJP + Kuitansi ZanFin + Struk Transfer Bank &rarr; Satukan ke Bundel SPJ LPPM / BIMA.
+  </div>
+
+  <div class="footer-bar">
+    <div>ZanFin Coretax Tax Guide · Halaman 3</div>
+    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+  </div>
+</div>
+
+<!-- HALAMAN 4: CHEAT SHEET 14 PERSONEL RESMI RAB EXCEL -->
+<div class="page" style="padding-top: 10px;">
+  <h1>Bab 4: Tabel Nominatif 14 Slip Honorarium (Cheat Sheet Siap Input)</h1>
+
+  <p>
+    Gunakan tabel di bawah ini sebagai rujukan pasti saat merekam e-Bupot 21/26. Seluruh data identitas NIK, NPWP, nilai bruto, dan nomor dokumen telah sinkron 100% dengan dokumen resmi RAB Excel Riset Bu Nadhiroh.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:24px">No</th>
+        <th>Nama Penerima</th>
+        <th>NIK KTP (16 Digit) &amp; NPWP</th>
+        <th>Kode Pajak</th>
+        <th class="tar">DPP Bruto</th>
+        <th class="tar">PPh 21 (5%)</th>
+        <th class="tar">Netto</th>
+        <th>No. Kuitansi (Ref)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="tac">1</td>
+        <td><b>Ahmad Fathony M., S.T., M.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber 1 FGD Gresik</span></td>
+        <td><code>3578041003940004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 89.696.748.6-612.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 900.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 45.000</td>
+        <td class="tar" style="font-weight:700">Rp 855.000</td>
+        <td><code>KWT-HR-017</code></td>
+      </tr>
+      <tr>
+        <td class="tac">2</td>
+        <td><b>Lestari Aji, S.Pi, M.A.Gr</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber 1 FGD Batu</span></td>
+        <td><code>3579011201980006</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 49.991.641.9-623.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 900.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 45.000</td>
+        <td class="tar" style="font-weight:700">Rp 855.000</td>
+        <td><code>KWT-HR-023</code></td>
+      </tr>
+      <tr>
+        <td class="tac">3</td>
+        <td><b>Iman Maulana, S.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Workshop Scorecard UNDRR</span></td>
+        <td><code>3578010101550007</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 92.018.086.6-614.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 900.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 45.000</td>
+        <td class="tar" style="font-weight:700">Rp 855.000</td>
+        <td><code>KWT-HR-039</code></td>
+      </tr>
+      <tr>
+        <td class="tac">4</td>
+        <td><b>Ahmad Fathony M., S.T., M.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Diseminasi Gresik</span></td>
+        <td><code>3578041003940004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 89.696.748.6-612.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 900.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 45.000</td>
+        <td class="tar" style="font-weight:700">Rp 855.000</td>
+        <td><code>KWT-HR-044A</code></td>
+      </tr>
+      <tr>
+        <td class="tac">5</td>
+        <td><b>Lestari Aji, S.Pi, M.A.Gr</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Diseminasi Batu</span></td>
+        <td><code>3579011201980006</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 49.991.641.9-623.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 900.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 45.000</td>
+        <td class="tar" style="font-weight:700">Rp 855.000</td>
+        <td><code>KWT-HR-044B</code></td>
+      </tr>
+      <tr>
+        <td class="tac">6</td>
+        <td><b>Allisa Nadhira, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Pengolah Data Analisis Gizi &amp; Tabulasi</span></td>
+        <td><code>3516134111010000</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 35.161.341.1-101.000</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tar">Rp 1.540.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 77.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.463.000</td>
+        <td><code>KWT-HR-055</code></td>
+      </tr>
+      <tr>
+        <td class="tac">7</td>
+        <td><b>Ratu Dien Prima Fermeza., S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3578195311030009</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 62.527.930.2-606.000</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-1</code></td>
+      </tr>
+      <tr>
+        <td class="tac">8</td>
+        <td><b>Kayla Auraline Erlawan, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3578195311030001</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-2</code></td>
+      </tr>
+      <tr>
+        <td class="tac">9</td>
+        <td><b>Nafiisah Zana Dzakiyyah, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3578064312030004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-3</code></td>
+      </tr>
+      <tr>
+        <td class="tac">10</td>
+        <td><b>Salma Violita Pradana, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3504116603030002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-4</code></td>
+      </tr>
+      <tr>
+        <td class="tac">11</td>
+        <td><b>Melanie Putri Anggraini, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3517036002040001</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-5</code></td>
+      </tr>
+      <tr>
+        <td class="tac">12</td>
+        <td><b>Maulidina Maiyarani Amroe, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3578085205040002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-6</code></td>
+      </tr>
+      <tr>
+        <td class="tac">13</td>
+        <td><b>Layyina Azka Nabila, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3515164902040003</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-7</code></td>
+      </tr>
+      <tr>
+        <td class="tac">14</td>
+        <td><b>Wichdah Layn Al’aqilah, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
+        <td><code>3514115709020002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tar">Rp 1.280.000</td>
+        <td class="tar" style="color:#b91c1c">Rp 64.000</td>
+        <td class="tar" style="font-weight:700">Rp 1.216.000</td>
+        <td><code>KWT-HR-056-8</code></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="background:#0f172a;color:#ffffff;font-weight:800;font-size:9.5pt">
+        <td colspan="4" class="tac">TOTAL REKAPITULASI 14 SLIP HONORARIUM</td>
+        <td class="tar" style="color:#38bdf8">Rp 16.280.000</td>
+        <td class="tar" style="color:#f87171">Rp 814.000</td>
+        <td class="tar" style="color:#4ade80">Rp 15.466.000</td>
+        <td class="tac">14 Kuitansi Sah</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="footer-bar">
+    <div>ZanFin Coretax Tax Guide · Halaman 4</div>
+    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+  </div>
+</div>
+
+<!-- HALAMAN 5: CHECKLIST SPJ AUDIT BPK / INSPEKTORAT -->
+<div class="page" style="padding-top: 10px;">
+  <h1>Bab 5: Checklist Kelengkapan Dokumen SPJ Audit Riset</h1>
+
+  <p>
+    Sesuai regulasi Peraturan Menteri Keuangan (PMK) dan Panduan Pelaksanaan Hibah Riset Kemendikbudristek, setiap pengeluaran honorarium wajib memiliki berkas pendukung fisik / digital lengkap. Gunakan checklist berikut saat menyusun LPJ:
+  </p>
+
+  <div class="card" style="padding:16px">
+    <h3 style="margin-top:0">Berkas Pendukung Honorarium Narasumber (FGD, Workshop, Diseminasi):</h3>
+    <ul style="margin-left:20px;line-height:1.7;font-size:9.2pt">
+      <li>☑ <b>Surat Undangan Resmi</b> sebagai narasumber dari Ketua Peneliti.</li>
+      <li>☑ <b>Surat Kesediaan</b> bertanda tangan dari narasumber.</li>
+      <li>☑ <b>Curriculum Vitae (CV) / Portofolio Keahlian</b> narasumber.</li>
+      <li>☑ <b>Materi / Bahan Tayang Paparan</b> (Slide presentasi PPT/PDF).</li>
+      <li>☑ <b>Daftar Hadir Narasumber &amp; Peserta Acara</b> bertanda tangan.</li>
+      <li>☑ <b>Dokumentasi Foto Kegiatan</b> dengan timestamp lokasi (GPS/Waktu).</li>
+      <li>☑ <b>Kuitansi Pembayaran Honorarium</b> resmi (sesuai nomor ZanFin).</li>
+      <li>☑ <b>Bukti Transfer Bank</b> (struk mutasi m-banking / bukti setor).</li>
+      <li>☑ <b>Bukti Potong PPh 21 (Form 1721-VIII)</b> terbitan resmi dari e-Bupot DJP.</li>
+    </ul>
+  </div>
+
+  <div class="card" style="padding:16px">
+    <h3 style="margin-top:0">Berkas Pendukung Petugas Survei Lapangan (8 Enumerator RT):</h3>
+    <ul style="margin-left:20px;line-height:1.7;font-size:9.2pt">
+      <li>☑ <b>Surat Keputusan (SK) / Surat Tugas</b> Tim Enumerator Lapangan dari Dekan/LPPM.</li>
+      <li>☑ <b>Fotokopi KTP (NIK 16 Digit) &amp; Kartu NPWP</b> masing-masing enumerator.</li>
+      <li>☑ <b>Logbook / Berita Acara Rekapitulasi</b> kuota responden (160 RT terpenuhi).</li>
+      <li>☑ <b>Kuitansi Tanda Terima Honor</b> bertanda tangan masing-masing penerima (Rp 1.216.000 netto).</li>
+      <li>☑ <b>Bukti Transfer Bank</b> ke rekening masing-masing petugas survei.</li>
+      <li>☑ <b>Bukti Potong e-Bupot 21/26 (Kode 21-100-02)</b> dari Coretax DJP.</li>
+    </ul>
+  </div>
+
+  <div style="background:#0f172a;color:#ffffff;border-radius:12px;padding:16px 20px;margin-top:20px;text-align:center">
+    <div style="font-weight:800;font-size:12pt;letter-spacing:0.5px">ZANDEV LAB INDONESIA</div>
+    <div style="font-size:9pt;color:#94a3b8;margin-top:4px">
+      Sistem Kontrol Finansial &amp; Otomasi Pajak Riset Akademik<br>
+      Kunjungi Portal Resmi: <a href="https://zandev.id" style="color:#38bdf8;text-decoration:none;font-weight:700">https://zandev.id</a>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div>ZanFin Coretax Tax Guide · Halaman 5 (Selesai)</div>
+    <div>Build n Code by <a href="https://zandev.id" target="_blank">zandev.id</a></div>
+  </div>
+</div>
+
+</body>
+</html>

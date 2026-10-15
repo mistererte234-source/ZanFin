@@ -4035,6 +4035,7 @@ function vPajak() {
       '<button class="btn pri block" style="flex:1" onclick="exportCoretaxCSV()">Ekspor CSV Coretax DJP</button>' +
       '<button class="btn block" style="flex:1" onclick="exportPajakExcel()">Unduh Rekap Pajak</button>' +
     '</div>' +
+    '<a href="/docs/Panduan_eBupot_Coretax_ZanFin.pdf" target="_blank" class="btn block" style="text-decoration:none;text-align:center;border-left:4px solid var(--info)">📖 Unduh Panduan Pengisian e-Bupot Coretax (.pdf)</a>' +
 
     '<div class="card">' +
       '<h3 style="margin-bottom:8px">Rincian Objek Pemotongan PPh 21</h3>' +
@@ -4043,10 +4044,12 @@ function vPajak() {
           ? '<p class="muted small" style="padding:12px 0">Belum ada pemotongan PPh 21.</p>'
           : pays.map(pay => {
               const w = S.workers.find(x => x.id === pay.wid);
+              const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
+              const kop = isEnum ? '21-100-02' : '21-100-09';
               return '<div class="it">' +
                 '<div class="t">' +
                   '<b>' + esc(w ? w.name : 'Personel') + '</b>' +
-                  '<span>NIK: ' + esc(w ? w.nik : '—') + ' · Bruto ' + rpC(pay.gross) + '</span>' +
+                  '<span>NIK: ' + esc(w ? w.nik : '—') + ' · KOP: ' + kop + ' · Bruto ' + rpC(pay.gross) + '</span>' +
                 '</div>' +
                 '<div class="r">' +
                   '<b style="color:var(--warning)">' + rpC(pay.tax_amt) + '</b>' +
@@ -4062,19 +4065,22 @@ function vPajak() {
 
 function exportCoretaxCSV() {
   const pays = payrollsOf(P().id);
-  let csv = 'Kode Pajak,Nama Penerima,NIK (16 Digit),NPWP,Bruto,Tarif Pajak,Potongan PPh 21,Tanggal,No Bukti Potong,Status Bukti Slip\n';
+  let csv = 'Kode Objek Pajak,Nama Penerima,NIK (16 Digit),NPWP,Dasar Pengenaan Pajak (DPP),Tarif,Jumlah PPh 21,Dokumen Dasar,Nomor Dokumen,Tanggal Dokumen,Status Dokumen Fisik\n';
   pays.forEach(pay => {
     const w = S.workers.find(x => x.id === pay.wid);
+    const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
+    const kop = isEnum ? '21-100-02' : '21-100-09';
     csv += [
-      '21-100-01',
+      kop,
       '"' + (w ? w.name : '') + '"',
       w ? w.nik : '',
       w ? w.npwp : '',
       pay.gross,
       (pay.tax_rate * 100).toFixed(1) + '%',
       pay.tax_amt,
-      pay.date,
+      '"Kuitansi"',
       pay.ref,
+      pay.date,
       pay.proof ? '"Ada Bukti (' + (pay.proof_name || 'Tersimpan') + ')"' : '"Belum Upload Slip"'
     ].join(',') + '\n';
   });
