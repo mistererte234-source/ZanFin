@@ -368,14 +368,23 @@
     </ol>
   </div>
 
-  <h2>Bab 2: Dua Pilihan Cara Pengisian di e-Bupot Coretax DJP</h2>
+  <h2>Bab 2: Mengapa Coretax Meminta Format XML &amp; Alur Impor BP21</h2>
+
+  <div class="callout-amber" style="margin:8px 0 12px">
+    <h3 style="color:#b45309;margin:0 0 4px">💡 Mengapa Saat Klik "Impor Data", Coretax DJP Meminta File Format XML (*.xml)?</h3>
+    <p style="margin:0;font-size:9pt;line-height:1.5;color:#78350f">
+      Dalam pembaruan sistem <b>Coretax DJP (PSIAP)</b>, Direktorat Jenderal Pajak resmi menghapus impor CSV lama dan mewajibkan standar <b>XML (*Extensible Markup Language*)</b>.<br>
+      Khusus untuk honorarium narasumber, pengolah data, dan petugas survei (selain pegawai tetap), jenis dokumennya dinamakan <b>BP21 (Bukti Pemotongan PPh 21 Selain Pegawai Tetap)</b>. Itulah sebabnya saat tombol <i>"Impor data"</i> ditekan di layar Coretax, Windows Explorer otomatis memfilter: <code>XML File (*.xml)</code>.
+    </p>
+  </div>
 
   <div class="step-box">
     <div class="step-num">A</div>
     <div class="step-content">
-      <b>Metode 1: Ekspor Impor Massal CSV Coretax dari ZanFin (Sangat Cepat - Sekali Klik)</b>
+      <b>Metode 1: Ekspor XML BP21 dari ZanFin (Rekomendasi Cepat — Langsung Upload!)</b>
       <p style="margin:0;font-size:9.2pt;color:#475569">
-        Bu Nadhiroh tidak perlu mengetik satu per satu 14 orang di web DJP. Cukup klik tombol <b>"Ekspor CSV Coretax DJP"</b> di menu <i>Pajak &amp; Coretax</i> pada ZanFin. File CSV yang dihasilkan sudah sesuai skema DJP. Buka akun DJP Bu Nadhiroh &rarr; <b>e-Bupot 21/26 &rarr; Impor Data Bukti Potong &rarr; Upload CSV</b>. Dalam 5 detik, ke-14 Bukti Potong otomatis terbit serentak!
+        ZanFin sudah dilengkapi <b>Generator XML Coretax BP21 Resmi</b>. Cukup buka menu <i>Pajak &amp; Coretax</i> di ZanFin &rarr; klik tombol <b>"⚡ Ekspor XML Coretax BP21"</b>. File <code>BP21_Coretax_DJP_*.xml</code> langsung terunduh.<br>
+        Buka layar Coretax akun Bu Nadhiroh &rarr; klik dropdown <b>Impor data &rarr; pilih file XML</b> tersebut &rarr; klik <b>Open</b>. Ke-14 Bukti Potong terbit otomatis dalam 3 detik!
       </p>
     </div>
   </div>
@@ -383,20 +392,30 @@
   <div class="step-box">
     <div class="step-num">B</div>
     <div class="step-content">
-      <b>Metode 2: Perekaman Manual Satu per Satu (Key-In Formulir Web DJP)</b>
+      <b>Metode 2: Menggunakan File Converter Resmi DJP (BP21 Excel to XML v.4.xlsx)</b>
       <p style="margin:0;font-size:9.2pt;color:#475569">
-        Bila Bu Nadhiroh atau bendahara memilih input manual satu per satu, gunakan data ringkas dari kartu slip honor ZanFin dengan urutan langkah di bawah ini.
+        Bila menggunakan converter resmi dari DJP: unduh file <code>BP21 Excel to XML v.4.xlsx</code> dari laman <i>pajak.go.id</i>, salin data 14 orang dari tabel Bab 4 ke sheet <code>DATA</code>, aktifkan tab <b>Developer</b> di Microsoft Excel, klik tombol <b>Export</b> untuk menghasilkan file <code>.xml</code>, lalu unggah ke Coretax.
       </p>
     </div>
   </div>
 
-  <h2>Langkah Demi Langkah Perekaman Formulir Bukti Potong (BP21):</h2>
+  <div class="step-box">
+    <div class="step-num">C</div>
+    <div class="step-content">
+      <b>Metode 3: Perekaman Manual di Web Coretax (Tombol "+ Create eBupot BP21")</b>
+      <p style="margin:0;font-size:9.2pt;color:#475569">
+        Bila ingin input satu per satu secara manual melalui form web: klik tombol <b>+ Create eBupot BP21</b> pada layar Coretax, masukkan NIK 16 digit penerima, pilih Kode Objek Pajak (KOP), input DPP bruto &amp; nomor kuitansi, lalu simpan.
+      </p>
+    </div>
+  </div>
+
+  <h2>Langkah Demi Langkah Perekaman Formulir Manual BP21 di Coretax:</h2>
 
   <div class="step-box">
     <div class="step-num">1</div>
     <div class="step-content">
-      <b>Login ke DJP Akun Ketua Peneliti &amp; Buka e-Bupot 21/26</b>
-      Akses <code>djponline.pajak.go.id</code> dengan NIK/NPWP Bu Nadhiroh. Masuk ke tab <b>e-Bupot 21/26</b> &rarr; pilih <b>Daftar Bukti Potong 21/26</b> &rarr; klik tombol <b>+ Rekam Bukti Potong (BP21)</b>.
+      <b>Login ke DJP Akun Ketua Peneliti &amp; Buka e-Bupot BP21</b>
+      Akses <code>djponline.pajak.go.id</code> dengan NIK/NPWP Bu Nadhiroh. Masuk ke tab <b>e-Bupot 21/26</b> &rarr; pilih <b>Daftar Bukti Potong 21/26</b> &rarr; klik tombol <b>+ Create eBupot BP21</b>.
     </div>
   </div>
 
@@ -411,11 +430,12 @@
   <div class="step-box">
     <div class="step-num">3</div>
     <div class="step-content">
-      <b>Pemilihan Kode Objek Pajak (KOP)</b>
-      Pilih kode objek pajak yang tepat sesuai RAB:
+      <b>Pemilihan Kode Objek Pajak (KOP Resmi Coretax BP21)</b>
+      Pilih kode objek pajak baku Coretax sesuai tugas personel:
       <ul style="margin:4px 0 0 16px;font-size:9pt;color:#334155">
-        <li><b>21-100-09</b> (Imbalan Bukan Pegawai - Tidak Berkesinambungan): Untuk <b>Narasumber FGD, Workshop, Diseminasi, &amp; Pengolah Data</b>.</li>
-        <li><b>21-100-02</b> (Pegawai Tidak Tetap / Tenaga Kerja Lepas): Untuk <b>8 Petugas Survei Lapangan (Enumerator RT)</b>.</li>
+        <li><b>21-100-18</b> (Imbalan kepada Penasihat, Pengajar, Penceramah, Moderator): Untuk <b>5 Narasumber FGD &amp; Diseminasi</b>.</li>
+        <li><b>21-100-20</b> (Imbalan kepada Pemberi Jasa dalam Segala Bidang): Untuk <b>1 Pengolah Data Gizi &amp; Tabulasi</b>.</li>
+        <li><b>21-100-24</b> (Upah Pegawai Tidak Tetap Harian/Satuan/Borongan &le; Rp2.500.000): Untuk <b>8 Petugas Survei Lapangan (Enumerator RT)</b>.</li>
       </ul>
     </div>
   </div>
@@ -501,7 +521,7 @@
         <td class="tac">1</td>
         <td><b>Ahmad Fathony M., S.T., M.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber 1 FGD Gresik</span></td>
         <td><code>3578041003940004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 89.696.748.6-612.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-18</span></td>
         <td class="tar">Rp 900.000</td>
         <td class="tar" style="color:#b91c1c">Rp 45.000</td>
         <td class="tar" style="font-weight:700">Rp 855.000</td>
@@ -511,7 +531,7 @@
         <td class="tac">2</td>
         <td><b>Lestari Aji, S.Pi, M.A.Gr</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber 1 FGD Batu</span></td>
         <td><code>3579011201980006</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 49.991.641.9-623.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-18</span></td>
         <td class="tar">Rp 900.000</td>
         <td class="tar" style="color:#b91c1c">Rp 45.000</td>
         <td class="tar" style="font-weight:700">Rp 855.000</td>
@@ -521,7 +541,7 @@
         <td class="tac">3</td>
         <td><b>Iman Maulana, S.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Workshop Scorecard UNDRR</span></td>
         <td><code>3578010101550007</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 92.018.086.6-614.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-18</span></td>
         <td class="tar">Rp 900.000</td>
         <td class="tar" style="color:#b91c1c">Rp 45.000</td>
         <td class="tar" style="font-weight:700">Rp 855.000</td>
@@ -531,7 +551,7 @@
         <td class="tac">4</td>
         <td><b>Ahmad Fathony M., S.T., M.T.</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Diseminasi Gresik</span></td>
         <td><code>3578041003940004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 89.696.748.6-612.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-18</span></td>
         <td class="tar">Rp 900.000</td>
         <td class="tar" style="color:#b91c1c">Rp 45.000</td>
         <td class="tar" style="font-weight:700">Rp 855.000</td>
@@ -541,7 +561,7 @@
         <td class="tac">5</td>
         <td><b>Lestari Aji, S.Pi, M.A.Gr</b><br><span style="font-size:7.5pt;color:#64748b">Narasumber Diseminasi Batu</span></td>
         <td><code>3579011201980006</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 49.991.641.9-623.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-18</span></td>
         <td class="tar">Rp 900.000</td>
         <td class="tar" style="color:#b91c1c">Rp 45.000</td>
         <td class="tar" style="font-weight:700">Rp 855.000</td>
@@ -551,7 +571,7 @@
         <td class="tac">6</td>
         <td><b>Allisa Nadhira, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Pengolah Data Analisis Gizi &amp; Tabulasi</span></td>
         <td><code>3516134111010000</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 35.161.341.1-101.000</span></td>
-        <td class="tac"><span class="pill pill-blue">21-100-09</span></td>
+        <td class="tac"><span class="pill pill-blue">21-100-20</span></td>
         <td class="tar">Rp 1.540.000</td>
         <td class="tar" style="color:#b91c1c">Rp 77.000</td>
         <td class="tar" style="font-weight:700">Rp 1.463.000</td>
@@ -561,7 +581,7 @@
         <td class="tac">7</td>
         <td><b>Ratu Dien Prima Fermeza., S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3578195311030009</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: 62.527.930.2-606.000</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -571,7 +591,7 @@
         <td class="tac">8</td>
         <td><b>Kayla Auraline Erlawan, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3578195311030001</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -581,7 +601,7 @@
         <td class="tac">9</td>
         <td><b>Nafiisah Zana Dzakiyyah, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3578064312030004</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -591,7 +611,7 @@
         <td class="tac">10</td>
         <td><b>Salma Violita Pradana, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3504116603030002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -601,7 +621,7 @@
         <td class="tac">11</td>
         <td><b>Melanie Putri Anggraini, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3517036002040001</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -611,7 +631,7 @@
         <td class="tac">12</td>
         <td><b>Maulidina Maiyarani Amroe, S.Gz</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3578085205040002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -621,7 +641,7 @@
         <td class="tac">13</td>
         <td><b>Layyina Azka Nabila, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3515164902040003</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>
@@ -631,7 +651,7 @@
         <td class="tac">14</td>
         <td><b>Wichdah Layn Al’aqilah, S.Gz.</b><br><span style="font-size:7.5pt;color:#64748b">Petugas Survei RT (160 Responden)</span></td>
         <td><code>3514115709020002</code><br><span style="font-size:7.5pt;color:#64748b">NPWP: - (NIK KTP)</span></td>
-        <td class="tac"><span class="pill pill-green">21-100-02</span></td>
+        <td class="tac"><span class="pill pill-green">21-100-24</span></td>
         <td class="tar">Rp 1.280.000</td>
         <td class="tar" style="color:#b91c1c">Rp 64.000</td>
         <td class="tar" style="font-weight:700">Rp 1.216.000</td>

@@ -4031,15 +4031,26 @@ function vPajak() {
       '</div>' +
     '</div>' +
 
-    '<div class="row" style="gap:8px">' +
-      '<button class="btn pri block" style="flex:1" onclick="exportCoretaxCSV()">Ekspor CSV Coretax DJP</button>' +
-      '<button class="btn block" style="flex:1" onclick="exportPajakExcel()">Unduh Rekap Pajak</button>' +
+    '<div class="card" style="background:linear-gradient(135deg, rgba(2,132,199,0.12), rgba(14,165,233,0.06));border:1.5px solid rgba(2,132,199,0.3);padding:14px 16px;border-radius:14px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span style="font-size:18px">🏛️</span>' +
+        '<b style="font-size:13px;color:var(--info)">Format Resmi Impor Coretax DJP: XML (BP21)</b>' +
+      '</div>' +
+      '<p class="small muted" style="margin:0 0 10px;line-height:1.5">Sistem Coretax DJP mewajibkan format file <b>XML (*.xml)</b> skema <b>BP21</b> untuk mengimpor bukti potong selain pegawai tetap secara massal. Unduh file XML resmi di bawah, lalu langsung pilih file tersebut di menu <b>Impor data</b> pada Coretax DJP!</p>' +
+      '<div class="row" style="gap:8px">' +
+        '<button class="btn pri block" style="flex:1.2;background:linear-gradient(135deg,#0284c7,#0369a1);font-weight:750" onclick="exportCoretaxXML()">⚡ Ekspor XML Coretax BP21</button>' +
+        '<button class="btn block" style="flex:0.8" onclick="exportCoretaxCSV()">Ekspor CSV</button>' +
+      '</div>' +
     '</div>' +
-    '<a href="/docs/Panduan_eBupot_Coretax_ZanFin.pdf" target="_blank" class="btn block" style="text-decoration:none;text-align:center;border-left:4px solid var(--info)">📖 Unduh Panduan Pengisian e-Bupot Coretax (.pdf)</a>' +
+
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn block" style="flex:1" onclick="exportPajakExcel()">📊 Unduh Rekap Pajak (Excel)</button>' +
+      '<a href="/docs/Panduan_eBupot_Coretax_ZanFin.pdf" target="_blank" class="btn block" style="flex:1;text-decoration:none;text-align:center;border-left:4px solid var(--info)">📖 Panduan e-Bupot (.pdf)</a>' +
+    '</div>' +
 
     '<div class="card" style="background:rgba(2,132,199,0.06);border-left:4px solid var(--info);padding:12px 14px">' +
       '<div style="font-weight:750;font-size:12.5px;color:var(--info);margin-bottom:4px">💡 Wewenang Pemotong Pajak: Ketua Peneliti (WPOP)</div>' +
-      '<p class="tiny muted" style="margin:0;line-height:1.5">Sesuai klausul hibah riset mandiri, penerbitan Bukti Potong 1721-VIII dilakukan dari akun <b>DJP Online pribadi Ketua Peneliti (Dr. Siti Rahayu Nadhiroh)</b>. Unduh file CSV di atas, lalu masuk menu <b>e-Bupot 21/26 &rarr; Impor Data Bukti Potong</b> untuk terbit serentak tanpa perlu ketik manual satu per satu.</p>' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">Sesuai klausul hibah riset mandiri, penerbitan Bukti Potong 1721-VIII dilakukan dari akun <b>DJP Online pribadi Ketua Peneliti (Dr. Siti Rahayu Nadhiroh)</b>. Klik tombol <b>"⚡ Ekspor XML Coretax BP21"</b> di atas, lalu masuk menu <b>e-Bupot 21/26 &rarr; Impor data</b> untuk terbit serentak tanpa perlu ketik manual satu per satu.</p>' +
     '</div>' +
 
     '<div class="card">' +
@@ -4050,7 +4061,7 @@ function vPajak() {
           : pays.map(pay => {
               const w = S.workers.find(x => x.id === pay.wid);
               const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
-              const kop = isEnum ? '21-100-02' : '21-100-09';
+              const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
               return '<div class="it">' +
                 '<div class="t">' +
                   '<b>' + esc(w ? w.name : 'Personel') + '</b>' +
@@ -4068,13 +4079,96 @@ function vPajak() {
   '</div>';
 }
 
+function exportCoretaxXML() {
+  const p = P();
+  const pays = payrollsOf(p.id);
+  if (!pays.length) {
+    toast('Belum ada pemotongan honor untuk diekspor ke XML');
+    return;
+  }
+
+  // TIN Pemotong (NIK / NPWP 16 digit Ketua Peneliti)
+  let tin = (p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '').replace(/\D/g, '');
+  if (!tin || tin.length < 15) {
+    const input = prompt(
+      'Masukkan NIK 16 Digit / NPWP Pemotong Pajak (Ketua Peneliti: ' + (p.leader || 'Dr. Siti Rahayu Nadhiroh') + '):',
+      tin || '3578015505790001'
+    );
+    if (!input) return;
+    tin = input.replace(/\D/g, '');
+    if (tin.length < 15) {
+      alert('NIK / NPWP harus minimal 15 atau 16 digit angka sesuai standar Coretax.');
+      return;
+    }
+    p.tin = tin;
+    localStorage.setItem('zanfin_coretax_tin', tin);
+    saveState();
+  }
+
+  const idPlace = (tin + '000000').slice(0, 22);
+
+  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  xml += '<Bp21Bulk xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n';
+  xml += '\t<TIN>' + tin + '</TIN>\n';
+  xml += '\t<ListOfBp21>\n';
+
+  pays.forEach(pay => {
+    const w = S.workers.find(x => x.id === pay.wid);
+    const rawTin = String((w && (w.nik || w.npwp)) || '0000000000000000').replace(/\D/g, '');
+    const counterpartTin = rawTin.length >= 15 ? rawTin : rawTin.padStart(16, '0');
+    const recipientNitku = (counterpartTin + '000000').slice(0, 22);
+
+    const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
+    // Kode Objek Pajak resmi Coretax BP21:
+    // 21-100-24: Upah Pegawai Tidak Tetap (Harian/Satuan/Borongan <= Rp2.500.000)
+    // 21-100-18: Imbalan Narasumber/Penceramah/Moderator
+    // 21-100-20: Imbalan Pemberi Jasa Lain (Pengolah Data)
+    const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
+    const deemed = 100;
+    const rate = 5;
+
+    const dateParts = String(pay.date || today()).split('-');
+    const year = parseInt(dateParts[0], 10) || 2026;
+    const month = parseInt(dateParts[1], 10) || 8;
+    const docDate = (dateParts.length === 3) ? dateParts.join('-') : today();
+
+    xml += '\t\t<Bp21>\n';
+    xml += '\t\t\t<TaxPeriodMonth>' + month + '</TaxPeriodMonth>\n';
+    xml += '\t\t\t<TaxPeriodYear>' + year + '</TaxPeriodYear>\n';
+    xml += '\t\t\t<CounterpartTin>' + counterpartTin + '</CounterpartTin>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivityOfIncomeRecipient>' + recipientNitku + '</IDPlaceOfBusinessActivityOfIncomeRecipient>\n';
+    xml += '\t\t\t<StatusTaxExemption>TK/0</StatusTaxExemption>\n';
+    xml += '\t\t\t<TaxCertificate>N/A</TaxCertificate>\n';
+    xml += '\t\t\t<TaxObjectCode>' + kop + '</TaxObjectCode>\n';
+    xml += '\t\t\t<Gross>' + Math.round(pay.gross) + '</Gross>\n';
+    xml += '\t\t\t<Deemed>' + deemed + '</Deemed>\n';
+    xml += '\t\t\t<Rate>' + rate + '</Rate>\n';
+    xml += '\t\t\t<Document>PaymentProof</Document>\n';
+    xml += '\t\t\t<DocumentNumber>' + (pay.ref || ('KWT-' + pay.id)) + '</DocumentNumber>\n';
+    xml += '\t\t\t<DocumentDate>' + docDate + '</DocumentDate>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivity>' + idPlace + '</IDPlaceOfBusinessActivity>\n';
+    xml += '\t\t\t<WithholdingDate>' + docDate + '</WithholdingDate>\n';
+    xml += '\t\t</Bp21>\n';
+  });
+
+  xml += '\t</ListOfBp21>\n';
+  xml += '</Bp21Bulk>\n';
+
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'BP21_Coretax_DJP_' + today() + '.xml';
+  a.click();
+  toast('File XML Coretax BP21 berhasil diunduh ✓');
+}
+
 function exportCoretaxCSV() {
   const pays = payrollsOf(P().id);
   let csv = 'Kode Objek Pajak,Nama Penerima,NIK (16 Digit),NPWP,Dasar Pengenaan Pajak (DPP),Tarif,Jumlah PPh 21,Dokumen Dasar,Nomor Dokumen,Tanggal Dokumen,Status Dokumen Fisik\n';
   pays.forEach(pay => {
     const w = S.workers.find(x => x.id === pay.wid);
     const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
-    const kop = isEnum ? '21-100-02' : '21-100-09';
+    const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
     csv += [
       kop,
       '"' + (w ? w.name : '') + '"',
