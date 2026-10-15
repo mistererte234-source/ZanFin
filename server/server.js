@@ -164,7 +164,7 @@ const defaultSeedUsers = [
   { username: 'admin', name: 'Administrator Operasional', role: 'admin', pass: 'admin123' },
   { username: 'ketua', name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.', role: 'ketua', pass: 'ketua123' },
   { username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', pass: 'bendahara123' },
-  { username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', pass: 'peneliti123' }
+  { username: 'peneliti', name: 'Allisa Nadhira, S.Gz.', role: 'peneliti', pass: 'peneliti123' }
 ];
 
 for (const u of defaultSeedUsers) {

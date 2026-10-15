@@ -12,3 +12,5 @@ data/
 scratch/
 docs/pdf_dump.txt
 ~$*
+__pycache__/
+*.pyc

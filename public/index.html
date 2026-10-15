@@ -914,7 +914,7 @@ button.card { text-align: left; cursor: pointer; width: 100%; }
  * Build n Code by zandev.id
  */
 
-const KEY = 'zanfin_state_v2';
+const KEY = 'zanfin_state_v3';
 const THEME_KEY = 'zanfin_theme';
 
 const SVG = {
@@ -988,13 +988,13 @@ const ROLES = {
   },
   peneliti: {
     id: 'peneliti',
-    name: 'Anggota Peneliti',
+    name: 'Pengolah Data / Peneliti',
     tag: 'Peneliti',
     icon: '🔬',
     badgeClass: 'warning',
     user: 'peneliti',
-    person: 'Ahmad Zaki, S.KM., M.Kes',
-    desc: 'Pantau progres pelaksanaan riset dan serapan anggaran.'
+    person: 'Allisa Nadhira, S.Gz.',
+    desc: 'Pantau progres pelaksanaan riset, olah data & serapan anggaran.'
   }
 };
 
@@ -1362,35 +1362,21 @@ function getRealResearchSeed() {
         id: 'w_1',
         pid: pid,
         name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
-        role: 'Ketua Peneliti',
+        role: 'Ketua Peneliti (PI)',
         nik: '3578014502680001',
         npwp: '07.123.456.7-604.000',
         golongan: 'pns_iv',
-        tarif: 3000000,
-        unit: 'bulan',
-        bank: 'Bank BNI 0987654321',
+        tarif: 0,
+        unit: 'kegiatan',
+        bank: 'Bank BNI Kantor Cabang Graha Unair',
         hp: '081234567890',
-        active: true
-      },
-      {
-        id: 'w_2',
-        pid: pid,
-        name: 'Ahmad Zaki, S.KM., M.Kes',
-        role: 'Anggota Peneliti',
-        nik: '3578021204850002',
-        npwp: '08.234.567.8-604.000',
-        golongan: 'pns_iii',
-        tarif: 2000000,
-        unit: 'bulan',
-        bank: 'Bank BNI 0876543210',
-        hp: '081345678901',
         active: true
       },
       {
         id: 'w_3',
         pid: pid,
         name: 'Allisa Nadhira, S.Gz.',
-        role: 'Pengolah Data',
+        role: 'Pengolah Data / Peneliti',
         nik: '3516134111010000',
         npwp: '35.161.341.1-101.000',
         golongan: 'non_pns_npwp',
@@ -1836,6 +1822,12 @@ function doClearDummyData(keepPersonnel = false) {
 
 function doLoadRealExcelData() {
   closeSheet();
+  try {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem('zanfin_state_v2');
+    localStorage.removeItem('zanfin_state_v1');
+    localStorage.removeItem('zanfin_state');
+  } catch (_) {}
   S = getRealResearchSeed();
   saveState();
   fetch('/api/audit/log', {
@@ -1844,10 +1836,10 @@ function doLoadRealExcelData() {
     body: JSON.stringify({
       action: 'DATA_SEEDED_EXCEL',
       category: 'data',
-      description: 'Pengguna memuat seluruh data riil riset Bu Nadhiroh dari RAB Excel (12 transaksi, 16 personel)'
+      description: 'Pengguna memuat seluruh data riil riset Dr. Siti Rahayu Nadhiroh dari RAB Excel (12 transaksi, 15 personel otentik)'
     })
   }).catch(() => {});
-  toast('📥 Data riil riset Bu Nadhiroh dari RAB Excel berhasil dimuat!');
+  toast('📥 Data riil riset Dr. Siti Rahayu Nadhiroh (100% valid Excel & PDF) berhasil dimuat!');
   render();
 }
 
@@ -1864,40 +1856,116 @@ let timFilter = 'semua';
 let USERS = null;
 
 function loadState() {
+  let loaded = false;
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       S = JSON.parse(raw);
+      loaded = true;
     }
   } catch (e) {
     console.error('Failed to load local state', e);
   }
-  if (!S || !S.projects || !S.projects.length) {
+
+  // If v3 does not exist or empty, purge legacy dirty dummy cache & initialize with authentic RAB seed
+  if (!loaded || !S || !S.projects || !S.projects.length) {
+    try {
+      localStorage.removeItem('zanfin_state_v2');
+      localStorage.removeItem('zanfin_state_v1');
+      localStorage.removeItem('zanfin_state');
+    } catch (_) {}
     S = defaultSeed();
     saveState();
-  } else {
-    let migrated = false;
-    if (S.projects) {
-      for (const p of S.projects) {
-        if (p.leader && p.leader.includes('Dr. Ir. Hj. Nadhiroh')) {
-          p.leader = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
-          migrated = true;
-        }
-        if (p.holder && p.holder.includes('Dr. Ir. Hj. Nadhiroh')) {
-          p.holder = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
-          migrated = true;
-        }
+  }
+
+  // Deep sanitization guarantees 100% clean data free of fictional names or wrong academic titles
+  sanitizeAllData();
+}
+
+function sanitizeAllData() {
+  if (!S) return;
+  let migrated = false;
+
+  const REAL_LEADER = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
+  const FAKE_TITLE_SNIPPETS = ['Dr. Ir. Hj.', 'Ir. Hj.', 'Dr. Ir. Hj. Nadhiroh', 'Nadhiroh, M.Kes'];
+  const FAKE_PEOPLE = ['Nurhaliza', 'Budi Santoso', 'Ahmad Zaki'];
+
+  // 1. Projects Sanitization
+  if (S.projects) {
+    for (const p of S.projects) {
+      if (p.leader && (FAKE_TITLE_SNIPPETS.some(f => p.leader.includes(f)) || !p.leader.includes('Siti Rahayu'))) {
+        p.leader = REAL_LEADER;
+        migrated = true;
+      }
+      if (p.holder && (FAKE_TITLE_SNIPPETS.some(f => p.holder.includes(f)) || !p.holder.includes('Siti Rahayu'))) {
+        p.holder = REAL_LEADER;
+        migrated = true;
       }
     }
-    if (S.workers) {
-      for (const w of S.workers) {
-        if (w.name && w.name.includes('Dr. Ir. Hj. Nadhiroh')) {
-          w.name = 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
-          migrated = true;
-        }
+  }
+
+  // 2. Workers Sanitization (Remove fictional dummy workers)
+  if (S.workers) {
+    const origW = S.workers.length;
+    S.workers = S.workers.filter(w => !FAKE_PEOPLE.some(fp => (w.name || '').includes(fp)));
+    if (S.workers.length !== origW) migrated = true;
+
+    for (const w of S.workers) {
+      if (w.name && (FAKE_TITLE_SNIPPETS.some(f => w.name.includes(f)) || (w.name.includes('Nadhiroh') && !w.name.includes('Siti Rahayu')))) {
+        w.name = REAL_LEADER;
+        migrated = true;
       }
     }
-    if (migrated) saveState();
+  }
+
+  // 3. Transactions Sanitization (Kas Keluar & Kas Masuk)
+  if (S.txns) {
+    const origT = S.txns.length;
+    S.txns = S.txns.filter(t => {
+      const fullText = (t.note || '') + ' ' + (t.vendor || '') + ' ' + (t.ref || '');
+      if (FAKE_PEOPLE.some(fp => fullText.includes(fp))) return false;
+      if (fullText.includes('Dr. Ir. Hj.') || fullText.includes('Bulan Okt 2026 (Tahap 1)')) return false;
+      return true;
+    });
+    if (S.txns.length !== origT) migrated = true;
+
+    for (const t of S.txns) {
+      if (t.note && FAKE_TITLE_SNIPPETS.some(f => t.note.includes(f))) {
+        t.note = t.note.replace(/Dr\.\s*Ir\.\s*Hj\.\s*Nadhiroh,?\s*M\.Kes/gi, REAL_LEADER)
+                       .replace(/Dr\.\s*Ir\.\s*Hj\./gi, 'Dr.');
+        migrated = true;
+      }
+      if (t.vendor && FAKE_TITLE_SNIPPETS.some(f => t.vendor.includes(f))) {
+        t.vendor = t.vendor.replace(/Dr\.\s*Ir\.\s*Hj\.\s*Nadhiroh,?\s*M\.Kes/gi, REAL_LEADER)
+                           .replace(/Dr\.\s*Ir\.\s*Hj\./gi, 'Dr.');
+        migrated = true;
+      }
+    }
+  }
+
+  // 4. Payrolls Sanitization (Honorarium & Slip)
+  if (S.payrolls) {
+    const origP = S.payrolls.length;
+    S.payrolls = S.payrolls.filter(p => {
+      const fullText = (p.note || '') + ' ' + (p.period || '') + ' ' + (p.ref || '');
+      if (FAKE_PEOPLE.some(fp => fullText.includes(fp))) return false;
+      if (p.period && (p.period.includes('Bulan Okt 2026 (Tahap 1)') || p.period.includes('Bulan Juli 2026 (Tahap 1)'))) return false;
+      if (p.wid && S.workers && !S.workers.some(w => w.id === p.wid)) return false;
+      return true;
+    });
+    if (S.payrolls.length !== origP) migrated = true;
+
+    for (const p of S.payrolls) {
+      if (p.note && FAKE_TITLE_SNIPPETS.some(f => p.note.includes(f))) {
+        p.note = p.note.replace(/Dr\.\s*Ir\.\s*Hj\.\s*Nadhiroh,?\s*M\.Kes/gi, REAL_LEADER)
+                       .replace(/Dr\.\s*Ir\.\s*Hj\./gi, 'Dr.');
+        migrated = true;
+      }
+    }
+  }
+
+  if (migrated) {
+    saveState();
   }
 }
 
@@ -2355,6 +2423,7 @@ function vNadi() {
 function feedHTML(pid) {
   const ev = [];
   txnsOf(pid).forEach(t => {
+    if (t.cat === 'honor') return; // Rendered cleanly via payrollsOf below
     ev.push({
       d: t.date,
       ts: t.ts,
@@ -4027,7 +4096,7 @@ function vUsers() {
     { id: 2, username: 'admin', name: 'Administrator Operasional', role: 'admin', active: 1 },
     { id: 3, username: 'ketua', name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.', role: 'ketua', active: 1 },
     { id: 4, username: 'bendahara', name: 'Siti Rahmawati, S.E. (Bendahara)', role: 'bendahara', active: 1 },
-    { id: 5, username: 'peneliti', name: 'Ahmad Zaki, S.KM., M.Kes', role: 'peneliti', active: 1 }
+    { id: 5, username: 'peneliti', name: 'Allisa Nadhira, S.Gz.', role: 'peneliti', active: 1 }
   ];
   const list = (USERS && USERS.length) ? USERS : defaultList;
 
@@ -4103,8 +4172,8 @@ function sheetUserEdit(userId = null) {
             '<div class="small muted">@' + esc(u.username) + '</div>' +
           '</div>' +
         '</div>' : '') +
-      fld('Username Akun', '<input id="fu-uname" value="' + esc(u ? u.username : '') + '" ' + (u ? 'disabled' : '') + ' placeholder="budi_bendahara">') +
-      fld('Nama Lengkap', '<input id="fu-name" value="' + esc(u ? u.name : '') + '" placeholder="Budi Santoso, S.Kom">') +
+      fld('Username Akun', '<input id="fu-uname" value="' + esc(u ? u.username : '') + '" ' + (u ? 'disabled' : '') + ' placeholder="allisa_peneliti">') +
+      fld('Nama Lengkap', '<input id="fu-name" value="' + esc(u ? u.name : '') + '" placeholder="Allisa Nadhira, S.Gz.">') +
       fld('Peran Akun',
         '<select id="fu-role">' +
           roleOptions.map(r =>

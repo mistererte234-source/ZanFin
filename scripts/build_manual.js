@@ -634,8 +634,8 @@ const htmlContent = `<!DOCTYPE html>
         <td><span class="mono">bendahara123</span></td>
       </tr>
       <tr>
-        <td><b>Ahmad Zaki, S.KM., M.Kes</b></td>
-        <td><span class="badge badge-amber">Anggota Peneliti</span></td>
+        <td><b>Allisa Nadhira, S.Gz.</b></td>
+        <td><span class="badge badge-amber">Pengolah Data / Peneliti</span></td>
         <td><span class="mono">peneliti</span></td>
         <td><span class="mono">peneliti123</span></td>
       </tr>
