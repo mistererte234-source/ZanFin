@@ -4,20 +4,15 @@ const path = require('path');
 
 // 14 real records from Bu Nadhiroh's authentic research grant
 const records = [
-  // 5 Narasumber
-  { name: 'Ahmad Fathony M., S.T., M.T.', nik: '3578041003940004', kop: '21-100-18', gross: 900000, deemed: 100, rate: 5, ref: 'KWT-HR-017', date: '2026-08-21' },
-  { name: 'Lestari Aji, S.Pi, M.A.Gr', nik: '3579011201980006', kop: '21-100-18', gross: 900000, deemed: 100, rate: 5, ref: 'KWT-HR-023', date: '2026-08-21' },
-  { name: 'Iman Maulana, S.T.', nik: '3578010101550007', kop: '21-100-18', gross: 900000, deemed: 100, rate: 5, ref: 'KWT-HR-039', date: '2026-08-21' },
-  { name: 'Ahmad Fathony M., S.T., M.T.', nik: '3578041003940004', kop: '21-100-18', gross: 900000, deemed: 100, rate: 5, ref: 'KWT-HR-044A', date: '2026-08-21' },
-  { name: 'Lestari Aji, S.Pi, M.A.Gr', nik: '3579011201980006', kop: '21-100-18', gross: 900000, deemed: 100, rate: 5, ref: 'KWT-HR-044B', date: '2026-08-21' },
-  // 1 Pengolah Data
-  { name: 'Allisa Nadhira, S.Gz.', nik: '3516134111010000', kop: '21-100-20', gross: 1540000, deemed: 100, rate: 5, ref: 'KWT-HR-055', date: '2026-08-30' },
-  // 8 Enumerator Lapangan
-  { name: 'Ratu Dien Prima Fermeza., S.Gz.', nik: '3578195311030009', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 5, ref: 'KWT-HR-056-1', date: '2026-08-30' },
-  { name: 'Kayla Auraline Erlawan, S.Gz.', nik: '3578195311030001', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 5, ref: 'KWT-HR-056-2', date: '2026-08-30' },
-  { name: 'Nafiisah Zana Dzakiyyah, S.Gz.', nik: '3578064312030004', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 5, ref: 'KWT-HR-056-3', date: '2026-08-30' },
-  { name: 'Salma Violita Pradana, S.Gz', nik: '3504116603030002', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 5, ref: 'KWT-HR-056-4', date: '2026-08-30' },
-  // 8 Enumerator Lapangan (Coretax rule: Rate = 0.5 for 21-100-24)
+  // 5 Narasumber (Coretax rule: Deemed WAJIB 50 untuk 21-100-18)
+  { name: 'Ahmad Fathony M., S.T., M.T.', nik: '3578041003940004', kop: '21-100-18', gross: 900000, deemed: 50, rate: 5, ref: 'KWT-HR-017', date: '2026-08-21' },
+  { name: 'Lestari Aji, S.Pi, M.A.Gr', nik: '3579011201980006', kop: '21-100-18', gross: 900000, deemed: 50, rate: 5, ref: 'KWT-HR-023', date: '2026-08-21' },
+  { name: 'Iman Maulana, S.T.', nik: '3578010101550007', kop: '21-100-18', gross: 900000, deemed: 50, rate: 5, ref: 'KWT-HR-039', date: '2026-08-21' },
+  { name: 'Ahmad Fathony M., S.T., M.T.', nik: '3578041003940004', kop: '21-100-18', gross: 900000, deemed: 50, rate: 5, ref: 'KWT-HR-044A', date: '2026-08-21' },
+  { name: 'Lestari Aji, S.Pi, M.A.Gr', nik: '3579011201980006', kop: '21-100-18', gross: 900000, deemed: 50, rate: 5, ref: 'KWT-HR-044B', date: '2026-08-21' },
+  // 1 Pengolah Data (Coretax rule: Deemed WAJIB 50 untuk 21-100-20)
+  { name: 'Allisa Nadhira, S.Gz.', nik: '3516134111010000', kop: '21-100-20', gross: 1540000, deemed: 50, rate: 5, ref: 'KWT-HR-055', date: '2026-08-30' },
+  // 8 Enumerator Lapangan (Coretax rule: Rate = 0.5 & Deemed = 100 for 21-100-24)
   { name: 'Ratu Dien Prima Fermeza., S.Gz.', nik: '3578195311030009', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 0.5, ref: 'KWT-HR-056-1', date: '2026-08-30' },
   { name: 'Kayla Auraline Erlawan, S.Gz.', nik: '3578195311030001', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 0.5, ref: 'KWT-HR-056-2', date: '2026-08-30' },
   { name: 'Nafiisah Zana Dzakiyyah, S.Gz.', nik: '3578064312030004', kop: '21-100-24', gross: 1280000, deemed: 100, rate: 0.5, ref: 'KWT-HR-056-3', date: '2026-08-30' },

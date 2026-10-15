@@ -4174,20 +4174,20 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
     const isPengolah = w && w.role.toLowerCase().includes('pengolah');
 
     let kop = '21-100-18';
-    let deemed = 100;
+    let deemed = 50; // Coretax validator rule: Nilai Deemed WAJIB 50 untuk 21-100-18
     let rate = 5;
 
     if (isPengolah) {
       kop = '21-100-20';
-      deemed = 100;
+      deemed = 50; // Coretax validator rule: Nilai Deemed WAJIB 50 untuk 21-100-20
       rate = 5;
     } else if (isEnum) {
       if (enumKopChoice === 'jasa_5') {
         kop = '21-100-20';
-        deemed = 100;
+        deemed = 50;
         rate = 5;
       } else {
-        // Coretax validator rule: TaxObjectCode 21-100-24 requires Rate 0.5
+        // Coretax validator rule: TaxObjectCode 21-100-24 requires Rate 0.5 and Deemed 100
         kop = '21-100-24';
         deemed = 100;
         rate = 0.5;
