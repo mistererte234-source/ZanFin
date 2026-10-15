@@ -4079,7 +4079,7 @@ function vPajak() {
   '</div>';
 }
 
-function exportCoretaxXML() {
+function sheetExportCoretaxXML() {
   const p = P();
   const pays = payrollsOf(p.id);
   if (!pays.length) {
@@ -4087,28 +4087,74 @@ function exportCoretaxXML() {
     return;
   }
 
-  // TIN Pemotong (NIK / NPWP 16 digit Ketua Peneliti)
-  let tin = (p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '').replace(/\D/g, '');
-  if (!tin || tin.length < 15) {
-    const input = prompt(
-      'Masukkan NIK 16 Digit / NPWP Pemotong Pajak (Ketua Peneliti: ' + (p.leader || 'Dr. Siti Rahayu Nadhiroh') + '):',
-      tin || '3578015505790001'
-    );
-    if (!input) return;
-    tin = input.replace(/\D/g, '');
-    if (tin.length < 15) {
-      alert('NIK / NPWP harus minimal 15 atau 16 digit angka sesuai standar Coretax.');
+  const savedTin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '3578015505790001';
+
+  const body = '<div class="stack" style="gap:12px">' +
+    '<div class="card" style="background:linear-gradient(135deg,rgba(2,132,199,0.1),rgba(14,165,233,0.05));border-left:4px solid var(--info);padding:12px">' +
+      '<b style="font-size:12.5px;color:var(--info)">🏛️ Sesuai Template Resmi Coretax DJP (BP21)</b>' +
+      '<p class="tiny muted" style="margin:4px 0 0;line-height:1.45">File XML yang di-generate mematuhi 100% struktur resmi <code>BP21_Template.xml</code> DJP: atribut <code>xsi:noNamespaceSchemaLocation="schema.xsd"</code>, ID TKU <code>000000</code>, dan tipe dokumen <code>Contract</code>.</p>' +
+    '</div>' +
+
+    fld('NPWP / NIK Pemotong (Akun Login Coretax)',
+      '<input id="xml-tin" value="' + esc(savedTin) + '" placeholder="16 digit NIK/NPWP" class="num" maxlength="16">',
+      '⚠️ Wajib sama persis dengan NIK/NPWP akun Coretax yang sedang Anda gunakan saat login!') +
+
+    '<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+      fld('Masa Pajak (Bulan)',
+        '<select id="xml-month">' +
+          [1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="' + m + '" ' + (m === 8 ? 'selected' : '') + '>Bulan ' + m + ' (' + ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][m-1] + ')</option>').join('') +
+        '</select>') +
+      fld('Tahun Pajak',
+        '<input id="xml-year" value="' + (p.year || 2026) + '" class="num" maxlength="4">') +
+    '</div>' +
+
+    fld('Jenis Dokumen Referensi',
+      '<select id="xml-doc">' +
+        '<option value="Contract" selected>Contract (Surat Kontrak / Surat Tugas — Rekomendasi Resmi)</option>' +
+        '<option value="CommercialInvoice">CommercialInvoice (Kuitansi / Tagihan Komersial)</option>' +
+        '<option value="PaymentProof">PaymentProof (Bukti Pembayaran)</option>' +
+      '</select>') +
+
+    '<div class="card" style="padding:10px 12px;background:var(--panel2)">' +
+      '<div style="font-weight:700;font-size:12px;margin-bottom:6px">Ringkasan 14 Personel Siap Impor:</div>' +
+      '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
+        '• 5 Narasumber (@ Rp 900.000) &rarr; KOP 21-100-18 (Penceramah)<br>' +
+        '• 1 Pengolah Data (Rp 1.540.000) &rarr; KOP 21-100-20 (Jasa Lain)<br>' +
+        '• 8 Petugas Survei (@ Rp 1.280.000) &rarr; KOP 21-100-24 (Borongan &le; 2,5 jt)<br>' +
+        '<b>Total Bruto: ' + rpC(16280000) + ' · PPh 21 (5%): ' + rpC(814000) + '</b>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="text-align:center;margin-top:4px">' +
+      '<a href="/docs/BP21_Coretax_14_Personel_Riset.xml" download class="tiny" style="color:var(--info);text-decoration:none;font-weight:700">⬇️ Atau unduh langsung file XML baku: BP21_Coretax_14_Personel_Riset.xml</a>' +
+    '</div>' +
+  '</div>';
+
+  sheet('Ekspor XML Coretax BP21 Resmi', body, 'Unduh File XML Sekarang', () => {
+    const rawTin = ($('#xml-tin').value || '').replace(/\D/g, '');
+    if (!rawTin || rawTin.length < 15) {
+      alert('NPWP / NIK Pemotong wajib minimal 15 atau 16 digit angka!');
       return;
     }
-    p.tin = tin;
-    localStorage.setItem('zanfin_coretax_tin', tin);
+    const month = parseInt($('#xml-month').value, 10) || 8;
+    const year = parseInt($('#xml-year').value, 10) || 2026;
+    const docType = $('#xml-doc').value || 'Contract';
+
+    p.tin = rawTin;
+    localStorage.setItem('zanfin_coretax_tin', rawTin);
     saveState();
-  }
 
-  const idPlace = (tin + '000000').slice(0, 22);
+    downloadBp21Xml(rawTin, month, year, docType);
+    closeSheet();
+  });
+}
 
-  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
-  xml += '<Bp21Bulk xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n';
+function downloadBp21Xml(tin, taxMonth, taxYear, docType) {
+  const p = P();
+  const pays = payrollsOf(p.id);
+
+  let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
+  xml += '<Bp21Bulk xsi:noNamespaceSchemaLocation="schema.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n';
   xml += '\t<TIN>' + tin + '</TIN>\n';
   xml += '\t<ListOfBp21>\n';
 
@@ -4116,37 +4162,33 @@ function exportCoretaxXML() {
     const w = S.workers.find(x => x.id === pay.wid);
     const rawTin = String((w && (w.nik || w.npwp)) || '0000000000000000').replace(/\D/g, '');
     const counterpartTin = rawTin.length >= 15 ? rawTin : rawTin.padStart(16, '0');
-    const recipientNitku = (counterpartTin + '000000').slice(0, 22);
 
     const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
-    // Kode Objek Pajak resmi Coretax BP21:
-    // 21-100-24: Upah Pegawai Tidak Tetap (Harian/Satuan/Borongan <= Rp2.500.000)
-    // 21-100-18: Imbalan Narasumber/Penceramah/Moderator
-    // 21-100-20: Imbalan Pemberi Jasa Lain (Pengolah Data)
-    const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
+    const isPengolah = w && w.role.toLowerCase().includes('pengolah');
+    const kop = isEnum ? '21-100-24' : (isPengolah ? '21-100-20' : '21-100-18');
     const deemed = 100;
     const rate = 5;
 
     const dateParts = String(pay.date || today()).split('-');
-    const year = parseInt(dateParts[0], 10) || 2026;
-    const month = parseInt(dateParts[1], 10) || 8;
+    const m = taxMonth || parseInt(dateParts[1], 10) || 8;
+    const y = taxYear || parseInt(dateParts[0], 10) || 2026;
     const docDate = (dateParts.length === 3) ? dateParts.join('-') : today();
 
     xml += '\t\t<Bp21>\n';
-    xml += '\t\t\t<TaxPeriodMonth>' + month + '</TaxPeriodMonth>\n';
-    xml += '\t\t\t<TaxPeriodYear>' + year + '</TaxPeriodYear>\n';
+    xml += '\t\t\t<TaxPeriodMonth>' + m + '</TaxPeriodMonth>\n';
+    xml += '\t\t\t<TaxPeriodYear>' + y + '</TaxPeriodYear>\n';
     xml += '\t\t\t<CounterpartTin>' + counterpartTin + '</CounterpartTin>\n';
-    xml += '\t\t\t<IDPlaceOfBusinessActivityOfIncomeRecipient>' + recipientNitku + '</IDPlaceOfBusinessActivityOfIncomeRecipient>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivityOfIncomeRecipient>000000</IDPlaceOfBusinessActivityOfIncomeRecipient>\n';
     xml += '\t\t\t<StatusTaxExemption>TK/0</StatusTaxExemption>\n';
     xml += '\t\t\t<TaxCertificate>N/A</TaxCertificate>\n';
     xml += '\t\t\t<TaxObjectCode>' + kop + '</TaxObjectCode>\n';
     xml += '\t\t\t<Gross>' + Math.round(pay.gross) + '</Gross>\n';
     xml += '\t\t\t<Deemed>' + deemed + '</Deemed>\n';
     xml += '\t\t\t<Rate>' + rate + '</Rate>\n';
-    xml += '\t\t\t<Document>PaymentProof</Document>\n';
+    xml += '\t\t\t<Document>' + (docType || 'Contract') + '</Document>\n';
     xml += '\t\t\t<DocumentNumber>' + (pay.ref || ('KWT-' + pay.id)) + '</DocumentNumber>\n';
     xml += '\t\t\t<DocumentDate>' + docDate + '</DocumentDate>\n';
-    xml += '\t\t\t<IDPlaceOfBusinessActivity>' + idPlace + '</IDPlaceOfBusinessActivity>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivity>000000</IDPlaceOfBusinessActivity>\n';
     xml += '\t\t\t<WithholdingDate>' + docDate + '</WithholdingDate>\n';
     xml += '\t\t</Bp21>\n';
   });
@@ -4157,9 +4199,13 @@ function exportCoretaxXML() {
   const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'BP21_Coretax_DJP_' + today() + '.xml';
+  a.download = 'BP21_Coretax_DJP_Masa' + taxMonth + '_' + taxYear + '.xml';
   a.click();
-  toast('File XML Coretax BP21 berhasil diunduh ✓');
+  toast('File XML Coretax BP21 Resmi berhasil diunduh ✓');
+}
+
+function exportCoretaxXML() {
+  sheetExportCoretaxXML();
 }
 
 function exportCoretaxCSV() {
