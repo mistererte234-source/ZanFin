@@ -16,7 +16,7 @@ const PUB = path.join(__dirname, '..', 'public');
 const SESSION_DAYS = 30;
 const MAX_BODY = 25 * 1024 * 1024;
 const PULL_BUDGET = 6 * 1024 * 1024;
-const COLLS = new Set(['projects', 'inflows', 'expenses', 'team', 'payroll', 'taxes', 'audit', 'reports', 'logs']);
+const COLLS = new Set(['projects', 'txns', 'workers', 'payrolls', 'spjChecklist', 'inflows', 'expenses', 'team', 'payroll', 'taxes', 'audit', 'reports', 'logs']);
 
 fs.mkdirSync(DATA, { recursive: true });
 const db = new DatabaseSync(path.join(DATA, 'zanfin.db'));

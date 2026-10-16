@@ -2062,7 +2062,20 @@ let USERS = null;
 function loadState() {
   let loaded = false;
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    if (!raw) {
+      // Check legacy state keys to recover any input the user had before version bump
+      const legacy = localStorage.getItem('zanfin_state_v5') || localStorage.getItem('zanfin_state_v4');
+      if (legacy) {
+        try {
+          const parsedLegacy = JSON.parse(legacy);
+          if (parsedLegacy && parsedLegacy.projects && parsedLegacy.projects.length) {
+            raw = legacy;
+            console.log('[ZanFin] Memulihkan data dari sesi sebelumnya (zanfin_state_v5)');
+          }
+        } catch (_) {}
+      }
+    }
     if (raw) {
       S = JSON.parse(raw);
       loaded = true;
@@ -2071,16 +2084,8 @@ function loadState() {
     console.error('Failed to load local state', e);
   }
 
-  // If v6 does not exist or has incomplete payroll (< 14 slips) or old enumerator rate (< 1.280.000) or old tax rates, purge legacy cache & load full seed
-  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 14 || S.payrolls.some(p => p.id === 'pay_enum_1' && (p.gross < 1280000 || p.tax_amt > 6400))) {
-    try {
-      localStorage.removeItem('zanfin_state_v5');
-      localStorage.removeItem('zanfin_state_v4');
-      localStorage.removeItem('zanfin_state_v3');
-      localStorage.removeItem('zanfin_state_v2');
-      localStorage.removeItem('zanfin_state_v1');
-      localStorage.removeItem('zanfin_state');
-    } catch (_) {}
+  // If state does not exist or has incomplete payroll (< 14 slips), load full seed
+  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 14) {
     S = defaultSeed();
     saveState();
   }
@@ -2202,7 +2207,239 @@ function saveState() {
   } catch (e) {
     console.error('Failed to save state', e);
   }
+  scheduleSync(300);
 }
+
+/* ==========================================================================
+   CLOUD REAL-TIME SYNC ENGINE (SQLite VPS Backend via /api/sync)
+   Build n Code by zandev.id
+   ========================================================================== */
+const SYNC_ARRS = ['projects', 'txns', 'workers', 'payrolls'];
+let syncInProgress = false;
+let syncQueued = false;
+let syncTimer = null;
+let SYNC_STATUS = 'synced'; // 'synced' | 'syncing' | 'offline' | 'error'
+
+function h53(str) {
+  let a = 0xdeadbeef, b = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    a = Math.imul(a ^ c, 2654435761);
+    b = Math.imul(b ^ c, 1597334677);
+  }
+  a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+  b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+  return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36);
+}
+
+function scheduleSync(delay = 500) {
+  if (MODE !== 'server' || !ME) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncWithServer(), delay);
+}
+
+function updateSyncUI(status, label) {
+  SYNC_STATUS = status || SYNC_STATUS;
+  const el = $('#sync-pill');
+  if (!el) return;
+  const cfg = {
+    synced: { bg: 'rgba(16,185,129,0.15)', col: '#10b981', dot: '#10b981', text: 'Cloud Aktif ✓' },
+    syncing: { bg: 'rgba(2,132,199,0.15)', col: 'var(--helm)', dot: 'var(--helm)', text: 'Menyimpan…' },
+    offline: { bg: 'rgba(245,158,11,0.15)', col: 'var(--warning)', dot: 'var(--warning)', text: 'Offline (Lokal)' },
+    error: { bg: 'rgba(239,68,68,0.15)', col: 'var(--bad)', dot: 'var(--bad)', text: 'Gagal Sync' }
+  }[SYNC_STATUS] || { bg: 'rgba(148,163,184,0.15)', col: 'var(--muted)', dot: 'var(--muted)', text: 'Cloud' };
+
+  el.style.background = cfg.bg;
+  el.style.color = cfg.col;
+  el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + cfg.dot + '"></span>' +
+    '<span style="font-weight:700">' + (label || cfg.text) + '</span>';
+}
+
+async function syncWithServer(manual = false) {
+  if (MODE !== 'server' || !ME) return;
+  if (syncInProgress) {
+    syncQueued = true;
+    return;
+  }
+  if (!navigator.onLine) {
+    updateSyncUI('offline');
+    if (manual) toast('Koneksi offline. Data aman di laptop ini dan dikirim otomatis saat online.');
+    return;
+  }
+
+  syncInProgress = true;
+  updateSyncUI('syncing');
+
+  try {
+    let lastRev = Number(localStorage.getItem('zanfin_last_rev')) || 0;
+    let syncedHashes = {};
+    try {
+      syncedHashes = JSON.parse(localStorage.getItem('zanfin_synced_hashes') || '{}');
+    } catch (_) {}
+
+    // 1. Collect dirty pushes
+    const pushes = [];
+    const seenKeys = new Set();
+
+    SYNC_ARRS.forEach(coll => {
+      const arr = S[coll] || [];
+      arr.forEach(item => {
+        if (!item || !item.id) return;
+        const k = coll + '|' + item.id;
+        seenKeys.add(k);
+        const js = JSON.stringify(item);
+        const h = h53(js);
+        if (syncedHashes[k] !== h) {
+          pushes.push({
+            coll,
+            id: item.id,
+            pid: item.pid || S.activeId,
+            data: item,
+            h
+          });
+        }
+      });
+    });
+
+    if (S.spjChecklist) {
+      const k = 'spjChecklist|default';
+      seenKeys.add(k);
+      const js = JSON.stringify(S.spjChecklist);
+      const h = h53(js);
+      if (syncedHashes[k] !== h) {
+        pushes.push({
+          coll: 'spjChecklist',
+          id: 'default',
+          pid: S.activeId,
+          data: S.spjChecklist,
+          h
+        });
+      }
+    }
+
+    // Detect deleted items
+    Object.keys(syncedHashes).forEach(k => {
+      if (!seenKeys.has(k)) {
+        const idx = k.indexOf('|');
+        pushes.push({
+          coll: k.slice(0, idx),
+          id: k.slice(idx + 1),
+          deleted: true
+        });
+      }
+    });
+
+    // 2. Transmit to server /api/sync
+    const payload = {
+      lastRev,
+      pushes: pushes.map(p => ({
+        coll: p.coll,
+        id: p.id,
+        pid: p.pid,
+        data: p.data,
+        deleted: p.deleted
+      }))
+    };
+
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        updateSyncUI('offline', 'Sesi habis');
+        return;
+      }
+      throw new Error('Server returned HTTP ' + res.status);
+    }
+
+    const resData = await res.json();
+    let changed = false;
+
+    // 3. Mark accepted pushes
+    pushes.forEach(p => {
+      const k = p.coll + '|' + p.id;
+      if (p.deleted) {
+        delete syncedHashes[k];
+      } else {
+        syncedHashes[k] = p.h;
+      }
+    });
+
+    // 4. Apply pulls from server
+    if (Array.isArray(resData.pulls) && resData.pulls.length > 0) {
+      resData.pulls.forEach(r => {
+        if (!r.coll) return;
+        const k = r.coll + '|' + r.id;
+
+        if (r.coll === 'spjChecklist') {
+          if (r.deleted) S.spjChecklist = {};
+          else S.spjChecklist = r.data || {};
+          syncedHashes[k] = h53(JSON.stringify(S.spjChecklist));
+          changed = true;
+          return;
+        }
+
+        if (!SYNC_ARRS.includes(r.coll)) return;
+        S[r.coll] = S[r.coll] || [];
+
+        if (r.deleted) {
+          const idx = S[r.coll].findIndex(x => x.id === r.id);
+          if (idx >= 0) {
+            S[r.coll].splice(idx, 1);
+            changed = true;
+          }
+          delete syncedHashes[k];
+        } else {
+          const idx = S[r.coll].findIndex(x => x.id === r.id);
+          if (idx >= 0) {
+            S[r.coll][idx] = r.data;
+          } else {
+            S[r.coll].push(r.data);
+          }
+          syncedHashes[k] = h53(JSON.stringify(r.data));
+          changed = true;
+        }
+      });
+    }
+
+    // 5. Update lastRev and persist
+    if (resData.latestRev != null) {
+      lastRev = Number(resData.latestRev) || lastRev;
+    }
+    localStorage.setItem('zanfin_last_rev', String(lastRev));
+    localStorage.setItem('zanfin_synced_hashes', JSON.stringify(syncedHashes));
+    localStorage.setItem(KEY, JSON.stringify(S));
+
+    updateSyncUI('synced');
+    if (manual) toast('✓ Data tersinkronisasi sempurna dengan Cloud VPS');
+    if (changed) render();
+  } catch (err) {
+    console.error('[ZanFin Sync]', err);
+    updateSyncUI('error');
+    if (manual) toast('Gagal sync: ' + err.message);
+  } finally {
+    syncInProgress = false;
+    if (syncQueued) {
+      syncQueued = false;
+      scheduleSync(200);
+    }
+  }
+}
+
+// Background auto-sync listeners
+window.addEventListener('online', () => { syncWithServer(); });
+window.addEventListener('offline', () => { updateSyncUI('offline'); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncWithServer();
+});
+setInterval(() => {
+  if (document.visibilityState === 'visible' && MODE === 'server' && ME) {
+    syncWithServer();
+  }
+}, 15000);
 
 function uid() {
   return 'z_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
@@ -2512,6 +2749,7 @@ async function doLogin() {
         checkBackupStatus();
         loadAuditLogs();
       }
+      syncWithServer();
       captureGps().then(pos => {
         if (pos) {
           fetch('/api/audit/ping', {
@@ -5678,6 +5916,7 @@ function renderHeader() {
           '<span>Zan<span style="color:var(--helm)">Fin</span></span>' +
         '</div>' +
         '<div class="top-controls">' +
+          '<button id="sync-pill" class="pill" onclick="syncWithServer(true)" title="Status Sinkronisasi Cloud VPS - Klik untuk sinkronkan sekarang" style="padding:3px 9px 3px 6px;font-size:11.5px;cursor:pointer;gap:5px;border:none;display:inline-flex;align-items:center"></button>' +
           '<button class="pill ' + (r.badgeClass || 'ok') + '" onclick="sheetSwitchRole()" aria-label="Ganti Peran" title="Klik untuk menu akun & ganti peran" style="padding:3px 10px 3px 5px;gap:6px">' +
             renderAvatar(userObj, 22) +
             '<b>' + r.tag + '</b>' +
@@ -5696,6 +5935,8 @@ function renderHeader() {
         '<span>' + esc(p.scheme || 'Riset Kemendikbudristek') + ' · ' + p.year + '</span>' +
       '</button>' +
     '</div>';
+
+  updateSyncUI(SYNC_STATUS);
 }
 
 function sheetSwitchRole() {
@@ -5764,6 +6005,7 @@ function sheetSwitchAccount() {
           toast('Berhasil masuk sebagai ' + ME.name + ' (' + (ROLE_L[ME.role] || ME.role) + ')');
           loadUsers();
           loadServerRoles();
+          syncWithServer();
           render();
         } else {
           $('#sheet-e').textContent = res.error || 'Password salah.';
@@ -5856,6 +6098,7 @@ async function init() {
       ME = data.user;
       MODE = 'server';
       loadUsers();
+      syncWithServer();
       if (canSuperAdmin()) {
         checkBackupStatus();
       }
