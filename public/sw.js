@@ -1,6 +1,6 @@
 /* ZanFin service worker — app shell cache + graceful update.
    Build n Code by zandev.id */
-const VERSION = 'zanfin-v3.4.0';
+const VERSION = 'zanfin-v3.5.0';
 const SHELL = [
   './',
   './index.html',

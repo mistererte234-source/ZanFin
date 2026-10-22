@@ -2621,6 +2621,8 @@ async function syncWithServer(manual = false) {
     }
 
     LAST_SYNC_ERR = '';
+    // Setelah sync bersih, kompres ulang nota lama yang terlanjur besar (sekali per sesi)
+    if (!_recompressDone) setTimeout(() => { recompressOldProofs().catch(e => console.warn(e)); }, 3000);
     if (rejectedCount) {
       LAST_SYNC_ERR = rejectedCount + ' data ditolak server (format tidak valid)';
       updateSyncUI('error');
@@ -3151,77 +3153,165 @@ function resetCurrentProof() {
   currentProof = null;
 }
 
+/* ==========================================================================
+   KOMPRES FOTO NOTA — satu fungsi untuk semua jalur upload.
+   - Batas piksel (bukan cuma sisi terpanjang) → struk thermal yang panjang
+     tetap terbaca, foto kamera 12–48 MP turun drastis.
+   - Kualitas JPEG adaptif sampai ukuran ≤ target (~220 KB).
+   - Latar putih untuk PNG transparan (kalau tidak, jadi hitam di JPEG).
+   - Re-encode juga membuang metadata EXIF (termasuk lokasi GPS kamera).
+   Build n Code by zandev.id
+   ========================================================================== */
+const NOTA_TARGET_BYTES = 220 * 1024;
+const NOTA_MAX_PIXELS = 1600000;   // ±1,6 MP (contoh: 1460×1095)
+const NOTA_MAX_SIDE = 2400;        // sisi terpanjang maksimum (struk thermal panjang)
+const NOTA_MIN_SIDE = 900;         // jangan sampai lebih kecil dari ini (agar tetap terbaca)
+const NOTA_RECOMPRESS_OVER = 320 * 1024; // nota lama di atas ukuran ini dikompres ulang
+const PDF_MAX_BYTES = 5 * 1024 * 1024;
+
+function dataUrlBytes(dataUrl) {
+  if (!dataUrl) return 0;
+  const i = dataUrl.indexOf(',');
+  return Math.round((dataUrl.length - (i >= 0 ? i + 1 : 0)) * 0.75);
+}
+
+async function decodeImageSource(src) {
+  // src: File/Blob atau dataURL string
+  let blob = src;
+  if (typeof src === 'string') blob = await (await fetch(src)).blob();
+  if (window.createImageBitmap) {
+    try {
+      return await createImageBitmap(blob, { imageOrientation: 'from-image' });
+    } catch (_) { /* fallback di bawah */ }
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('File gambar tidak valid atau rusak'));
+      img.src = url;
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+async function compressNotaImage(src) {
+  const img = await decodeImageSource(src);
+  const iw = img.width || img.naturalWidth;
+  const ih = img.height || img.naturalHeight;
+  if (!iw || !ih) throw new Error('Ukuran gambar tidak terbaca');
+
+  let scale = Math.min(1, Math.sqrt(NOTA_MAX_PIXELS / (iw * ih)), NOTA_MAX_SIDE / Math.max(iw, ih));
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  let best = null;
+
+  for (let round = 0; round < 6; round++) {
+    const w = Math.max(1, Math.round(iw * scale));
+    const h = Math.max(1, Math.round(ih * scale));
+    canvas.width = w;
+    canvas.height = h;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+
+    for (const q of [0.8, 0.72, 0.64, 0.56, 0.5]) {
+      const url = canvas.toDataURL('image/jpeg', q);
+      const bytes = dataUrlBytes(url);
+      if (!best || bytes < best.size) best = { dataUrl: url, size: bytes, width: w, height: h };
+      if (bytes <= NOTA_TARGET_BYTES) {
+        if (img.close) img.close();
+        return { dataUrl: url, size: bytes, width: w, height: h };
+      }
+    }
+    // Masih kebesaran di kualitas 0.5 → perkecil dimensi, tapi jaga keterbacaan
+    if (Math.max(w, h) * 0.8 < NOTA_MIN_SIDE) break;
+    scale *= 0.8;
+  }
+  if (img.close) img.close();
+  return best; // hasil terkecil yang masih terbaca
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('Gagal membaca berkas'));
+    r.readAsDataURL(file);
+  });
+}
+
+/* Proses satu berkas bukti (foto/PDF) → { dataUrl, type, name, size } */
+async function processProofFile(file) {
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isImg = (file.type || '').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(file.name);
+  if (!isPdf && !isImg) throw new Error('Format tidak didukung. Pilih foto nota (JPG, PNG, WebP) atau PDF.');
+  if (isPdf) {
+    if (file.size > PDF_MAX_BYTES) throw new Error('Ukuran PDF maksimal 5 MB. Kalau nota hasil scan, lebih hemat difoto saja.');
+    const dataUrl = await readFileAsDataUrl(file);
+    return { dataUrl, type: 'pdf', name: file.name, size: file.size };
+  }
+  const out = await compressNotaImage(file);
+  console.log('[ZanFin] Nota dikompres: ' + Math.round(file.size / 1024) + ' KB → ' + Math.round(out.size / 1024) + ' KB (' + out.width + '×' + out.height + ')');
+  return { dataUrl: out.dataUrl, type: 'image', name: file.name, size: out.size, originalSize: file.size };
+}
+
+/* Kompres ulang nota lama yang terlanjur besar (berjalan diam-diam sekali per sesi). */
+let _recompressDone = false;
+async function recompressOldProofs() {
+  if (_recompressDone || !S) return;
+  _recompressDone = true;
+  const targets = [];
+  ['txns', 'payrolls'].forEach(coll => {
+    (S[coll] || []).forEach(item => {
+      if (item && typeof item.proof === 'string' && item.proof.startsWith('data:image/') &&
+          dataUrlBytes(item.proof) > NOTA_RECOMPRESS_OVER) targets.push(item);
+    });
+  });
+  if (!targets.length) return;
+  let saved = 0, count = 0;
+  const cache = new Map(); // foto yang sama (honor ↔ transaksi) cukup diproses sekali
+  for (const item of targets) {
+    try {
+      const before = dataUrlBytes(item.proof);
+      let out = cache.get(item.proof);
+      if (!out) {
+        out = await compressNotaImage(item.proof);
+        cache.set(item.proof, out);
+      }
+      if (out && out.size < before * 0.9) {
+        item.proof = out.dataUrl;
+        item.proof_type = 'image';
+        saved += before - out.size;
+        count++;
+      }
+    } catch (e) {
+      console.warn('[ZanFin] Lewati kompres ulang nota', item.id, e);
+    }
+    await new Promise(r => setTimeout(r, 30)); // beri jeda agar UI tetap responsif
+  }
+  if (count) {
+    console.log('[ZanFin] Kompres ulang ' + count + ' nota lama, hemat ' + Math.round(saved / 1024) + ' KB');
+    saveState();
+  }
+}
+
 function handleProofFileSelect(event, previewContainerId) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
-
-  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  const isImg = file.type.startsWith('image/');
-
-  if (!isPdf && !isImg) {
-    alert('Format file tidak didukung. Harap pilih foto nota (JPG, PNG, WebP) atau berkas dokumen PDF.');
-    return;
-  }
-
-  if (isPdf) {
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Ukuran berkas PDF maksimal 5 MB.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-      currentProof = {
-        dataUrl: e.target.result,
-        name: file.name,
-        type: 'pdf',
-        size: file.size
-      };
-      renderProofPreview(previewContainerId);
-    };
-    reader.readAsDataURL(file);
-    return;
-  }
-
-  // Compress image to readable OCR quality (max 1280px, ~60-120KB)
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const maxDim = 1280;
-      let w = img.width;
-      let h = img.height;
-      if (w > maxDim || h > maxDim) {
-        if (w > h) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, w, h);
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
-
-      currentProof = {
-        dataUrl: compressedDataUrl,
-        name: file.name,
-        type: 'image',
-        size: Math.round(compressedDataUrl.length * 0.75)
-      };
-      renderProofPreview(previewContainerId);
-    };
-    img.onerror = () => {
-      alert('Gagal memproses file foto nota.');
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+  const el = document.getElementById(previewContainerId);
+  if (el) el.innerHTML = '<div class="tiny muted" style="padding:14px;text-align:center">⏳ Memperkecil foto nota…</div>';
+  processProofFile(file).then(p => {
+    currentProof = p;
+    renderProofPreview(previewContainerId);
+  }).catch(err => {
+    alert(err.message || 'Gagal memproses file nota.');
+    renderProofPreview(previewContainerId);
+  });
 }
 
 function removeCurrentProof(previewContainerId) {
@@ -3310,47 +3400,23 @@ function attachProofToTxn(txnId) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*,application/pdf';
-  input.onchange = e => {
+  input.onchange = async e => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    const reader = new FileReader();
-    reader.onload = ev => {
-      if (isPdf) {
-        t.proof = ev.target.result;
-        t.proof_name = file.name;
-        t.proof_type = 'pdf';
-        t.spj_ok = true;
-        saveState();
-        toast('Bukti PDF berhasil dilampirkan ✓');
-        sheetTxnDetail(txnId);
-        render();
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 1280;
-        let w = img.width, h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-          else { w = Math.round((w * maxDim) / h); h = maxDim; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        t.proof = canvas.toDataURL('image/jpeg', 0.82);
-        t.proof_name = file.name;
-        t.proof_type = 'image';
-        t.spj_ok = true;
-        saveState();
-        toast('Foto bukti nota berhasil dilampirkan ✓');
-        sheetTxnDetail(txnId);
-        render();
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    toast('⏳ Memproses bukti nota…');
+    try {
+      const p = await processProofFile(file);
+      t.proof = p.dataUrl;
+      t.proof_name = p.name;
+      t.proof_type = p.type;
+      t.spj_ok = true;
+      saveState();
+      toast(p.type === 'pdf' ? 'Bukti PDF berhasil dilampirkan ✓' : 'Foto nota dilampirkan ✓ (' + Math.round(p.size / 1024) + ' KB)');
+      sheetTxnDetail(txnId);
+      render();
+    } catch (err) {
+      alert(err.message || 'Gagal memproses file nota.');
+    }
   };
   input.click();
 }
@@ -3374,53 +3440,31 @@ function attachProofToPayroll(payId) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*,application/pdf';
-  input.onchange = e => {
+  input.onchange = async e => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const applyProof = (dataUrl, pType) => {
-        pay.proof = dataUrl;
-        pay.proof_name = file.name;
-        pay.proof_type = pType;
+    toast('⏳ Memproses bukti transfer…');
+    try {
+      const p = await processProofFile(file);
+      pay.proof = p.dataUrl;
+      pay.proof_name = p.name;
+      pay.proof_type = p.type;
 
-        const matchingTx = S.txns.find(t => t.ref === pay.ref && t.cat === 'honor');
-        if (matchingTx) {
-          matchingTx.proof = dataUrl;
-          matchingTx.proof_name = file.name;
-          matchingTx.proof_type = pType;
-          matchingTx.spj_ok = true;
-        }
-
-        saveState();
-        toast('Bukti transfer / slip gaji e-Bupot berhasil disimpan ✓');
-        sheetSlipDetail(payId);
-        render();
-      };
-
-      if (isPdf) {
-        applyProof(ev.target.result, 'pdf');
-        return;
+      const matchingTx = S.txns.find(t => t.ref === pay.ref && t.cat === 'honor');
+      if (matchingTx) {
+        matchingTx.proof = p.dataUrl;
+        matchingTx.proof_name = p.name;
+        matchingTx.proof_type = p.type;
+        matchingTx.spj_ok = true;
       }
 
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 1280;
-        let w = img.width, h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-          else { w = Math.round((w * maxDim) / h); h = maxDim; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        applyProof(canvas.toDataURL('image/jpeg', 0.82), 'image');
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+      saveState();
+      toast('Bukti transfer / slip gaji e-Bupot berhasil disimpan ✓');
+      sheetSlipDetail(payId);
+      render();
+    } catch (err) {
+      alert(err.message || 'Gagal memproses file bukti.');
+    }
   };
   input.click();
 }
