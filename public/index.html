@@ -2060,39 +2060,61 @@ let kasFilter = 'semua';
 let timFilter = 'semua';
 let USERS = null;
 
-function loadState() {
+async function loadState() {
   let loaded = false;
+  let fromIdb = false;
+
+  // 1. IndexedDB (penyimpanan utama sejak perbaikan sync)
   try {
-    let raw = localStorage.getItem(KEY);
-    if (!raw) {
-      // Check legacy state keys to recover any input the user had before version bump
-      const legacy = localStorage.getItem('zanfin_state_v5') || localStorage.getItem('zanfin_state_v4');
-      if (legacy) {
-        try {
-          const parsedLegacy = JSON.parse(legacy);
-          if (parsedLegacy && parsedLegacy.projects && parsedLegacy.projects.length) {
-            raw = legacy;
-            console.log('[ZanFin] Memulihkan data dari sesi sebelumnya (zanfin_state_v5)');
-          }
-        } catch (_) {}
-      }
-    }
-    if (raw) {
-      S = JSON.parse(raw);
+    const got = await idbGetMany([KEY, META_KEY]);
+    if (got[KEY] && got[KEY].projects) {
+      S = got[KEY];
       loaded = true;
+      fromIdb = true;
+      if (got[META_KEY]) SYNC_META = Object.assign(SYNC_META, got[META_KEY]);
     }
   } catch (e) {
-    console.error('Failed to load local state', e);
+    console.warn('[ZanFin] IndexedDB tidak tersedia, pakai localStorage', e);
   }
 
-  // If state does not exist or has incomplete payroll (< 14 slips), load full seed
-  if (!loaded || !S || !S.projects || !S.projects.length || !S.payrolls || S.payrolls.length < 14) {
-    S = defaultSeed();
-    saveState();
+  // 2. Cadangan / migrasi dari localStorage (versi lama)
+  if (!loaded) {
+    try {
+      let raw = localStorage.getItem(KEY) || localStorage.getItem('zanfin_state_v5') || localStorage.getItem('zanfin_state_v4');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.projects && parsed.projects.length) {
+          S = parsed;
+          loaded = true;
+        }
+      }
+      const metaRaw = localStorage.getItem(META_KEY);
+      if (loaded && metaRaw) {
+        // Fallback mode localStorage yang konsisten (ditulis berpasangan)
+        try { SYNC_META = Object.assign(SYNC_META, JSON.parse(metaRaw)); } catch (_) {}
+      } else {
+        // Data dari versi lama: metadata sync lama TIDAK dipercaya (bisa tidak cocok
+        // dengan state karena dulu penulisan localStorage sering gagal) → bootstrap ulang.
+        SYNC_META = { lastRev: 0, hashes: {}, epoch: null, bootstrapped: false, freshSeed: false };
+      }
+    } catch (e) {
+      console.error('Failed to load local state', e);
+    }
   }
+
+  // 3. Benar-benar kosong → data awal. Di mode server, seed ini akan dibuang
+  //    otomatis bila server sudah punya data (lihat bootstrapSync).
+  if (!loaded || !S || !S.projects || !S.projects.length) {
+    S = defaultSeed();
+    SYNC_META = { lastRev: 0, hashes: {}, epoch: null, bootstrapped: false, freshSeed: true };
+  }
+  S.txns = S.txns || [];
+  S.workers = S.workers || [];
+  S.payrolls = S.payrolls || [];
 
   // Deep sanitization guarantees 100% clean data free of fictional names or wrong academic titles
   sanitizeAllData();
+  if (!fromIdb) persistAll();
 }
 
 function sanitizeAllData() {
@@ -2202,24 +2224,122 @@ function sanitizeAllData() {
   }
 }
 
-function saveState() {
+/* ==========================================================================
+   PENYIMPANAN LOKAL (IndexedDB) — menggantikan localStorage untuk data utama.
+   localStorage dibatasi ±5 MB per domain; foto/PDF nota (base64) membuatnya
+   penuh sehingga penyimpanan & sinkronisasi gagal. IndexedDB jauh lebih lega
+   dan state + metadata sinkron ditulis dalam SATU transaksi (atomik).
+   Build n Code by zandev.id
+   ========================================================================== */
+const IDB_NAME = 'zanfin_store';
+const IDB_STORE = 'kv';
+const META_KEY = 'zanfin_sync_meta_v2';
+let SYNC_META = { lastRev: 0, hashes: {}, epoch: null, bootstrapped: false, freshSeed: false };
+let _idbPromise = null;
+let _idbBroken = false;
+let _persistWarned = false;
+
+function idbOpen() {
+  if (_idbBroken || !('indexedDB' in window)) return Promise.reject(new Error('IndexedDB tidak tersedia'));
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(IDB_NAME, 1); } catch (e) { reject(e); return; }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('Gagal membuka IndexedDB'));
+    req.onblocked = () => reject(new Error('IndexedDB diblokir tab lain'));
+  }).catch(e => {
+    _idbBroken = true;
+    _idbPromise = null;
+    throw e;
+  });
+  return _idbPromise;
+}
+
+async function idbGetMany(keys) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const store = tx.objectStore(IDB_STORE);
+    const out = {};
+    keys.forEach(k => {
+      const r = store.get(k);
+      r.onsuccess = () => { out[k] = r.result; };
+    });
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Transaksi IndexedDB dibatalkan'));
+  });
+}
+
+let _persistChain = Promise.resolve();
+/* Tulis S + SYNC_META bersamaan. Nilai di-clone saat put() dipanggil, jadi
+   pasangan state & metadata selalu konsisten satu sama lain. */
+function persistAll() {
+  const job = _persistChain.then(async () => {
+    try {
+      const db = await idbOpen();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        const store = tx.objectStore(IDB_STORE);
+        store.put(S, KEY);
+        store.put(SYNC_META, META_KEY);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Transaksi IndexedDB dibatalkan'));
+      });
+      cleanupLegacyLocalStorage();
+    } catch (e) {
+      // Cadangan: localStorage (mode lama). Bisa penuh jika banyak lampiran.
+      try {
+        localStorage.setItem(KEY, JSON.stringify(S));
+        localStorage.setItem(META_KEY, JSON.stringify(SYNC_META));
+      } catch (e2) {
+        console.error('[ZanFin] Gagal menyimpan data lokal', e, e2);
+        if (!_persistWarned) {
+          _persistWarned = true;
+          toast('⚠️ Penyimpanan perangkat penuh. Data tetap dikirim ke server selama online.');
+        }
+      }
+    }
+  });
+  _persistChain = job.catch(() => {});
+  return job;
+}
+
+let _legacyCleaned = false;
+function cleanupLegacyLocalStorage() {
+  if (_legacyCleaned) return;
+  _legacyCleaned = true;
   try {
-    localStorage.setItem(KEY, JSON.stringify(S));
-  } catch (e) {
-    console.error('Failed to save state', e);
-  }
+    ['zanfin_state_v6', 'zanfin_state_v5', 'zanfin_state_v4', 'zanfin_last_rev', 'zanfin_synced_hashes', META_KEY]
+      .forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+}
+
+function saveState() {
+  persistAll();
   scheduleSync(300);
 }
 
 /* ==========================================================================
    CLOUD REAL-TIME SYNC ENGINE (SQLite VPS Backend via /api/sync)
+   - Bootstrap "pull dulu" untuk perangkat baru / setelah migrasi / restore
+   - Tidak menimpa perubahan lokal yang belum terkirim (anti data hilang)
+   - Push dipecah per batch ukuran, pull berhalaman (tidak ada data terlewat)
    Build n Code by zandev.id
    ========================================================================== */
 const SYNC_ARRS = ['projects', 'txns', 'workers', 'payrolls'];
+const PUSH_BATCH_BYTES = 3 * 1024 * 1024;
 let syncInProgress = false;
 let syncQueued = false;
 let syncTimer = null;
 let SYNC_STATUS = 'synced'; // 'synced' | 'syncing' | 'offline' | 'error'
+let LAST_SYNC_ERR = '';
 
 function h53(str) {
   let a = 0xdeadbeef, b = 0x41c6ce57;
@@ -2252,8 +2372,193 @@ function updateSyncUI(status, label) {
 
   el.style.background = cfg.bg;
   el.style.color = cfg.col;
+  el.title = SYNC_STATUS === 'error' && LAST_SYNC_ERR
+    ? 'Gagal sync: ' + LAST_SYNC_ERR + ' — klik untuk coba lagi'
+    : 'Status Sinkronisasi Cloud VPS - Klik untuk sinkronkan sekarang';
   el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + cfg.dot + '"></span>' +
     '<span style="font-weight:700">' + (label || cfg.text) + '</span>';
+}
+
+/* ---- helper akses data lokal per koleksi ---- */
+function syncGetLocal(coll, id) {
+  if (coll === 'spjChecklist') return S.spjChecklist || null;
+  return (S[coll] || []).find(x => x && String(x.id) === String(id)) || null;
+}
+
+function syncSetLocal(coll, id, data) {
+  if (coll === 'spjChecklist') {
+    if (S.spjChecklist && typeof S.spjChecklist === 'object') {
+      Object.keys(S.spjChecklist).forEach(key => delete S.spjChecklist[key]);
+      Object.assign(S.spjChecklist, data || {});
+    } else {
+      S.spjChecklist = data || {};
+    }
+    return;
+  }
+  S[coll] = S[coll] || [];
+  const cur = S[coll].find(x => x && String(x.id) === String(id));
+  if (cur) {
+    // Update di tempat (in-place) supaya form/sheet yang sedang terbuka tetap
+    // memegang objek yang sama dan perubahan user tidak "hilang".
+    Object.keys(cur).forEach(key => delete cur[key]);
+    Object.assign(cur, data);
+  } else {
+    S[coll].push(data);
+  }
+}
+
+function syncRemoveLocal(coll, id) {
+  if (coll === 'spjChecklist') { S.spjChecklist = {}; return; }
+  const arr = S[coll] || [];
+  const idx = arr.findIndex(x => x && String(x.id) === String(id));
+  if (idx >= 0) arr.splice(idx, 1);
+}
+
+/* Terapkan satu baris dari server. serverWins=false → perubahan lokal yang
+   belum terkirim TIDAK ditimpa (akan dikirim pada putaran berikutnya). */
+function applyPull(r, serverWins) {
+  if (!r || !r.coll || r.id == null) return false;
+  if (r.coll !== 'spjChecklist' && !SYNC_ARRS.includes(r.coll)) return false;
+  const k = r.coll + '|' + r.id;
+  const H = SYNC_META.hashes;
+  const local = syncGetLocal(r.coll, r.id);
+  const localH = local ? h53(JSON.stringify(local)) : null;
+  const dirty = local ? H[k] !== localH : H[k] !== undefined;
+  if (dirty && !serverWins) return false;
+
+  if (r.deleted) {
+    delete H[k];
+    if (local) { syncRemoveLocal(r.coll, r.id); return true; }
+    return false;
+  }
+  const data = r.data || {};
+  if (r.coll !== 'spjChecklist' && data.id == null) data.id = r.id;
+  const newH = h53(JSON.stringify(data));
+  H[k] = newH;
+  if (localH === newH) return false; // identik (mis. gema push sendiri)
+  syncSetLocal(r.coll, r.id, data);
+  return true;
+}
+
+async function postSync(body) {
+  let res;
+  try {
+    res = await fetch('/api/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (e) {
+    throw new Error('Tidak bisa menghubungi server (' + (e.message || 'jaringan') + ')');
+  }
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  if (res.status === 401) { const e = new Error('Sesi login habis, silakan masuk lagi'); e.code = 401; throw e; }
+  if (res.status === 409 && data && data.resync) { const e = new Error(data.error || 'Perlu sinkron ulang'); e.code = 409; e.epoch = data.epoch; throw e; }
+  if (res.status === 413) throw new Error('Lampiran terlalu besar untuk server (HTTP 413)');
+  if (!res.ok || !data) throw new Error((data && data.error) || ('Server merespons HTTP ' + res.status));
+  return data;
+}
+
+function collectPushes() {
+  const H = SYNC_META.hashes;
+  const pushes = [];
+  const seen = new Set();
+  SYNC_ARRS.forEach(coll => {
+    (S[coll] || []).forEach(item => {
+      if (!item || item.id == null || item.id === '') return;
+      const id = String(item.id);
+      const k = coll + '|' + id;
+      if (seen.has(k)) return; // id ganda: kirim sekali saja
+      seen.add(k);
+      const js = JSON.stringify(item);
+      const h = h53(js);
+      if (H[k] !== h) pushes.push({ coll, id, pid: item.pid || S.activeId, data: item, h, size: js.length });
+    });
+  });
+  if (S.spjChecklist) {
+    const k = 'spjChecklist|default';
+    seen.add(k);
+    const js = JSON.stringify(S.spjChecklist);
+    const h = h53(js);
+    if (H[k] !== h) pushes.push({ coll: 'spjChecklist', id: 'default', pid: S.activeId, data: S.spjChecklist, h, size: js.length });
+  }
+  Object.keys(H).forEach(k => {
+    if (!seen.has(k)) {
+      const idx = k.indexOf('|');
+      pushes.push({ coll: k.slice(0, idx), id: k.slice(idx + 1), deleted: true, size: 64 });
+    }
+  });
+  return pushes;
+}
+
+function batchPushes(pushes) {
+  const batches = [];
+  let cur = [];
+  let bytes = 0;
+  pushes.forEach(p => {
+    if (cur.length && bytes + p.size > PUSH_BATCH_BYTES) {
+      batches.push(cur);
+      cur = [];
+      bytes = 0;
+    }
+    cur.push(p);
+    bytes += p.size;
+  });
+  if (cur.length) batches.push(cur);
+  return batches;
+}
+
+/* Tarik semua sisa halaman dari server. */
+async function drainPulls(firstResp, serverWins, seenKeys) {
+  let resp = firstResp;
+  let changed = false;
+  for (let guard = 0; guard < 1000; guard++) {
+    (resp.pulls || []).forEach(r => {
+      if (seenKeys) seenKeys.add(r.coll + '|' + r.id);
+      if (applyPull(r, serverWins)) changed = true;
+    });
+    if (resp.latestRev != null) SYNC_META.lastRev = Number(resp.latestRev) || SYNC_META.lastRev;
+    if (resp.epoch != null) SYNC_META.epoch = resp.epoch;
+    if (!resp.more) break;
+    resp = await postSync({ lastRev: SYNC_META.lastRev, epoch: SYNC_META.epoch, pushes: [] });
+  }
+  return changed;
+}
+
+/* Bootstrap: ambil SELURUH data server dulu (server menang), baru setelah itu
+   data lokal yang belum dikenal server dikirim. Mencegah seed/data basi dari
+   perangkat baru menimpa data asli di server. */
+async function bootstrapSync() {
+  SYNC_META.lastRev = 0;
+  SYNC_META.hashes = {};
+  SYNC_META.epoch = null;
+  const seenKeys = new Set();
+  const first = await postSync({ lastRev: 0, pushes: [] });
+  let changed = await drainPulls(first, true, seenKeys);
+
+  let anyLive = false;
+  seenKeys.forEach(k => { if (SYNC_META.hashes[k] !== undefined) anyLive = true; });
+
+  if (SYNC_META.freshSeed && anyLive) {
+    // Perangkat baru berisi data contoh (seed) → buang item seed yang tidak ada di server.
+    SYNC_ARRS.forEach(coll => {
+      const before = (S[coll] || []).length;
+      const kept = (S[coll] || []).filter(x => x && seenKeys.has(coll + '|' + x.id));
+      if (coll === 'projects' && !kept.length) return; // jangan sampai tanpa proyek
+      S[coll] = kept;
+      if (kept.length !== before) changed = true;
+    });
+  }
+  if (S.projects && S.projects.length && !S.projects.some(p => p.id === S.activeId)) {
+    S.activeId = S.projects[0].id;
+    changed = true;
+  }
+  SYNC_META.bootstrapped = true;
+  SYNC_META.freshSeed = false;
+  await persistAll();
+  return changed;
 }
 
 async function syncWithServer(manual = false) {
@@ -2264,168 +2569,86 @@ async function syncWithServer(manual = false) {
   }
   if (!navigator.onLine) {
     updateSyncUI('offline');
-    if (manual) toast('Koneksi offline. Data aman di laptop ini dan dikirim otomatis saat online.');
+    if (manual) toast('Koneksi offline. Data aman di perangkat ini dan dikirim otomatis saat online.');
     return;
   }
 
   syncInProgress = true;
   updateSyncUI('syncing');
+  let changed = false;
 
   try {
-    let lastRev = Number(localStorage.getItem('zanfin_last_rev')) || 0;
-    let syncedHashes = {};
-    try {
-      syncedHashes = JSON.parse(localStorage.getItem('zanfin_synced_hashes') || '{}');
-    } catch (_) {}
+    if (!SYNC_META.bootstrapped) {
+      if (await bootstrapSync()) changed = true;
+    }
 
-    // 1. Collect dirty pushes
-    const pushes = [];
-    const seenKeys = new Set();
+    const pushes = collectPushes();
+    const batches = pushes.length ? batchPushes(pushes) : [[]];
+    let rejectedCount = 0;
 
-    SYNC_ARRS.forEach(coll => {
-      const arr = S[coll] || [];
-      arr.forEach(item => {
-        if (!item || !item.id) return;
-        const k = coll + '|' + item.id;
-        seenKeys.add(k);
-        const js = JSON.stringify(item);
-        const h = h53(js);
-        if (syncedHashes[k] !== h) {
-          pushes.push({
-            coll,
-            id: item.id,
-            pid: item.pid || S.activeId,
-            data: item,
-            h
-          });
-        }
-      });
-    });
-
-    if (S.spjChecklist) {
-      const k = 'spjChecklist|default';
-      seenKeys.add(k);
-      const js = JSON.stringify(S.spjChecklist);
-      const h = h53(js);
-      if (syncedHashes[k] !== h) {
-        pushes.push({
-          coll: 'spjChecklist',
-          id: 'default',
-          pid: S.activeId,
-          data: S.spjChecklist,
-          h
+    for (const batch of batches) {
+      let resp;
+      try {
+        resp = await postSync({
+          lastRev: SYNC_META.lastRev,
+          epoch: SYNC_META.epoch,
+          pushes: batch.map(p => ({ coll: p.coll, id: p.id, pid: p.pid, data: p.data, deleted: p.deleted }))
         });
-      }
-    }
-
-    // Detect deleted items
-    Object.keys(syncedHashes).forEach(k => {
-      if (!seenKeys.has(k)) {
-        const idx = k.indexOf('|');
-        pushes.push({
-          coll: k.slice(0, idx),
-          id: k.slice(idx + 1),
-          deleted: true
-        });
-      }
-    });
-
-    // 2. Transmit to server /api/sync
-    const payload = {
-      lastRev,
-      pushes: pushes.map(p => ({
-        coll: p.coll,
-        id: p.id,
-        pid: p.pid,
-        data: p.data,
-        deleted: p.deleted
-      }))
-    };
-
-    const res = await fetch('/api/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        updateSyncUI('offline', 'Sesi habis');
-        return;
-      }
-      throw new Error('Server returned HTTP ' + res.status);
-    }
-
-    const resData = await res.json();
-    let changed = false;
-
-    // 3. Mark accepted pushes
-    pushes.forEach(p => {
-      const k = p.coll + '|' + p.id;
-      if (p.deleted) {
-        delete syncedHashes[k];
-      } else {
-        syncedHashes[k] = p.h;
-      }
-    });
-
-    // 4. Apply pulls from server
-    if (Array.isArray(resData.pulls) && resData.pulls.length > 0) {
-      resData.pulls.forEach(r => {
-        if (!r.coll) return;
-        const k = r.coll + '|' + r.id;
-
-        if (r.coll === 'spjChecklist') {
-          if (r.deleted) S.spjChecklist = {};
-          else S.spjChecklist = r.data || {};
-          syncedHashes[k] = h53(JSON.stringify(S.spjChecklist));
-          changed = true;
-          return;
+      } catch (e) {
+        if (e.code === 409) {
+          // Server habis di-restore: ulang dari awal (server menang).
+          SYNC_META.bootstrapped = false;
+          await persistAll();
+          syncQueued = true;
+          throw new Error('Database server baru dipulihkan, menyinkronkan ulang…');
         }
+        throw e;
+      }
 
-        if (!SYNC_ARRS.includes(r.coll)) return;
-        S[r.coll] = S[r.coll] || [];
-
-        if (r.deleted) {
-          const idx = S[r.coll].findIndex(x => x.id === r.id);
-          if (idx >= 0) {
-            S[r.coll].splice(idx, 1);
-            changed = true;
-          }
-          delete syncedHashes[k];
-        } else {
-          const idx = S[r.coll].findIndex(x => x.id === r.id);
-          if (idx >= 0) {
-            S[r.coll][idx] = r.data;
-          } else {
-            S[r.coll].push(r.data);
-          }
-          syncedHashes[k] = h53(JSON.stringify(r.data));
-          changed = true;
-        }
+      const acc = new Set(resp.accepted || batch.map(p => p.coll + '|' + p.id));
+      rejectedCount += (resp.rejected || []).length;
+      // Tandai push yang diterima SEBELUM menerapkan pull,
+      // agar gema data sendiri dikenali & perubahan baru tidak tertimpa.
+      batch.forEach(p => {
+        const k = p.coll + '|' + p.id;
+        if (!acc.has(k)) return;
+        if (p.deleted) delete SYNC_META.hashes[k];
+        else SYNC_META.hashes[k] = p.h;
       });
+
+      if (await drainPulls(resp, false)) changed = true;
+      await persistAll();
     }
 
-    // 5. Update lastRev and persist
-    if (resData.latestRev != null) {
-      lastRev = Number(resData.latestRev) || lastRev;
+    LAST_SYNC_ERR = '';
+    if (rejectedCount) {
+      LAST_SYNC_ERR = rejectedCount + ' data ditolak server (format tidak valid)';
+      updateSyncUI('error');
+    } else {
+      updateSyncUI('synced');
     }
-    localStorage.setItem('zanfin_last_rev', String(lastRev));
-    localStorage.setItem('zanfin_synced_hashes', JSON.stringify(syncedHashes));
-    localStorage.setItem(KEY, JSON.stringify(S));
-
-    updateSyncUI('synced');
-    if (manual) toast('✓ Data tersinkronisasi sempurna dengan Cloud VPS');
-    if (changed) render();
+    if (manual) toast(rejectedCount ? '⚠️ ' + LAST_SYNC_ERR : '✓ Data tersinkronisasi dengan Cloud VPS');
   } catch (err) {
     console.error('[ZanFin Sync]', err);
-    updateSyncUI('error');
-    if (manual) toast('Gagal sync: ' + err.message);
+    LAST_SYNC_ERR = err.message || String(err);
+    if (err.code === 401) {
+      updateSyncUI('offline', 'Sesi habis');
+      if (manual) toast('Sesi login habis. Silakan masuk lagi; data aman di perangkat ini.');
+    } else {
+      updateSyncUI('error');
+      if (manual) toast('Gagal sync: ' + LAST_SYNC_ERR);
+    }
+    // Coba lagi otomatis dengan jeda
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncWithServer(), 20000);
   } finally {
     syncInProgress = false;
+    if (changed) {
+      try { render(); } catch (e) { console.error(e); }
+    }
     if (syncQueued) {
       syncQueued = false;
-      scheduleSync(200);
+      scheduleSync(300);
     }
   }
 }
@@ -5853,6 +6076,7 @@ function sheetLogin() {
           toast('Berhasil login sebagai ' + ME.name);
           loadUsers();
           loadServerRoles();
+          syncWithServer();
           renderHeader();
           render();
         } else {
@@ -6090,7 +6314,7 @@ async function init() {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }
 
-  loadState();
+  await loadState();
 
   try {
     const r = await fetch('/api/me');

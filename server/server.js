@@ -16,6 +16,7 @@ const PUB = path.join(__dirname, '..', 'public');
 const SESSION_DAYS = 30;
 const MAX_BODY = 25 * 1024 * 1024;
 const PULL_BUDGET = 6 * 1024 * 1024;
+const PULL_LIMIT = 500;
 const COLLS = new Set(['projects', 'txns', 'workers', 'payrolls', 'spjChecklist', 'inflows', 'expenses', 'team', 'payroll', 'taxes', 'audit', 'reports', 'logs']);
 
 fs.mkdirSync(DATA, { recursive: true });
@@ -80,6 +81,7 @@ CREATE INDEX IF NOT EXISTS records_pid ON records(pid);
 
 CREATE TABLE IF NOT EXISTS counter(k TEXT PRIMARY KEY, v INTEGER NOT NULL);
 INSERT OR IGNORE INTO counter(k, v) VALUES ('rev', 0);
+INSERT OR IGNORE INTO counter(k, v) VALUES ('epoch', CAST(abs(random()) % 2000000000 AS INTEGER));
 
 CREATE TABLE IF NOT EXISTS audit_logs(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,6 +145,17 @@ function nextRev() {
   db.exec("UPDATE counter SET v = v + 1 WHERE k = 'rev'");
   const row = db.prepare("SELECT v FROM counter WHERE k = 'rev'").get();
   return row ? row.v : 1;
+}
+
+function getEpoch() {
+  const row = db.prepare("SELECT v FROM counter WHERE k = 'epoch'").get();
+  return row ? row.v : 0;
+}
+
+function bumpEpoch() {
+  const v = 1 + Math.floor(Math.random() * 2000000000);
+  db.prepare("INSERT INTO counter (k, v) VALUES ('epoch', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(v);
+  return v;
 }
 
 function hashPass(pwd) {
@@ -420,8 +433,11 @@ function readBody(req) {
     req.on('data', chunk => {
       bytes += chunk.length;
       if (bytes > MAX_BODY) {
-        reject(new Error('Body too large'));
-        req.destroy();
+        const err = new Error('Ukuran data terlalu besar (maks ' + Math.round(MAX_BODY / 1048576) + ' MB per kiriman)');
+        err.status = 413;
+        req.removeAllListeners('data');
+        req.resume();
+        reject(err);
         return;
       }
       chunks.push(chunk);
@@ -585,68 +601,101 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       const clientRev = Number(payload.lastRev) || 0;
       const pushes = Array.isArray(payload.pushes) ? payload.pushes : [];
+      const epoch = getEpoch();
 
-      // Save pushes inside transaction
+      // Klien membawa epoch lama (mis. setelah restore backup) → minta klien bootstrap ulang,
+      // jangan terima push berbasis data lama.
+      if (payload.epoch != null && Number(payload.epoch) !== epoch) {
+        return sendJson(res, 409, { error: 'Database server telah dipulihkan, perangkat perlu sinkron ulang', resync: true, epoch });
+      }
+
+      // Simpan push dalam satu transaksi. Item rusak dilewati (bukan menggagalkan seluruh batch).
+      const accepted = [];
+      const rejected = [];
+      const upsert = db.prepare(`
+        INSERT INTO records (coll, id, pid, data, deleted, rev, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(coll, id) DO UPDATE SET
+          pid = excluded.pid,
+          data = excluded.data,
+          deleted = excluded.deleted,
+          rev = excluded.rev,
+          updated_at = excluded.updated_at,
+          updated_by = excluded.updated_by
+      `);
       db.exec('BEGIN IMMEDIATE');
       try {
         for (const item of pushes) {
-          if (!COLLS.has(item.coll)) continue;
+          const id = item && typeof item.id === 'string' ? item.id : (item && typeof item.id === 'number' ? String(item.id) : '');
+          if (!item || !COLLS.has(item.coll) || !id || id.length > 200) {
+            rejected.push({ coll: item && item.coll, id: item && item.id });
+            continue;
+          }
           const rev = nextRev();
-          db.prepare(`
-            INSERT INTO records (coll, id, pid, data, deleted, rev, updated_at, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(coll, id) DO UPDATE SET
-              pid = excluded.pid,
-              data = excluded.data,
-              deleted = excluded.deleted,
-              rev = excluded.rev,
-              updated_at = excluded.updated_at,
-              updated_by = excluded.updated_by
-          `).run(
+          upsert.run(
             item.coll,
-            item.id,
-            item.pid || null,
-            JSON.stringify(item.data || {}),
+            id,
+            item.pid != null ? String(item.pid) : null,
+            item.deleted ? '{}' : JSON.stringify(item.data || {}),
             item.deleted ? 1 : 0,
             rev,
             Date.now(),
             user.id
           );
+          accepted.push(item.coll + '|' + id);
         }
         db.exec('COMMIT');
-        if (pushes.length > 0) {
-          const collSet = [...new Set(pushes.map(p => p.coll))].join(', ');
-          recordAudit(req, user, 'SYNC_SAVE', 'data', `Menyimpan ${pushes.length} pembaruan data (${collSet})`);
-        }
       } catch (e) {
-        db.exec('ROLLBACK');
+        try { db.exec('ROLLBACK'); } catch (_) {}
         throw e;
       }
+      if (accepted.length > 0) {
+        const collSet = [...new Set(pushes.map(p => p && p.coll).filter(Boolean))].join(', ');
+        recordAudit(req, user, 'SYNC_SAVE', 'data', `Menyimpan ${accepted.length} pembaruan data (${collSet})`);
+      }
 
-      // Fetch server changes newer than clientRev
+      // Tarik perubahan server setelah clientRev, berhalaman (LIMIT + batas ukuran).
+      // latestRev yang dikirim = rev baris terakhir yang benar-benar dikirim, sehingga
+      // tidak ada data yang "terlewat" walau perubahan di server lebih dari 1 halaman.
       const rows = db.prepare(`
         SELECT coll, id, pid, data, deleted, rev, updated_at
         FROM records
         WHERE rev > ?
         ORDER BY rev ASC
-        LIMIT 1000
-      `).all(clientRev);
+        LIMIT ?
+      `).all(clientRev, PULL_LIMIT + 1);
 
-      const pulls = rows.map(r => ({
-        coll: r.coll,
-        id: r.id,
-        pid: r.pid,
-        data: JSON.parse(r.data || '{}'),
-        deleted: Boolean(r.deleted),
-        rev: r.rev,
-        updated_at: r.updated_at
-      }));
+      const pulls = [];
+      let bytes = 0;
+      let more = false;
+      for (const r of rows) {
+        const len = (r.data || '').length;
+        if (pulls.length >= PULL_LIMIT || (pulls.length > 0 && bytes + len > PULL_BUDGET)) {
+          more = true;
+          break;
+        }
+        bytes += len;
+        let data = {};
+        try { data = JSON.parse(r.data || '{}'); } catch (_) {}
+        pulls.push({
+          coll: r.coll,
+          id: r.id,
+          pid: r.pid,
+          data,
+          deleted: Boolean(r.deleted),
+          rev: r.rev,
+          updated_at: r.updated_at
+        });
+      }
 
-      const latestRevRow = db.prepare("SELECT v FROM counter WHERE k = 'rev'").get();
-      return sendJson(res, 200, {
-        latestRev: latestRevRow ? latestRevRow.v : 0,
-        pulls
-      });
+      let latestRev;
+      if (more) {
+        latestRev = pulls[pulls.length - 1].rev;
+      } else {
+        const latestRevRow = db.prepare("SELECT v FROM counter WHERE k = 'rev'").get();
+        latestRev = Math.max(latestRevRow ? latestRevRow.v : 0, clientRev);
+      }
+      return sendJson(res, 200, { latestRev, more, epoch, accepted, rejected, pulls });
     }
 
     if (pathname === '/api/users') {
@@ -1091,6 +1140,13 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
+        // Pastikan counter rev >= rev tertinggi di records, lalu ganti epoch
+        // supaya semua perangkat tahu harus sinkron ulang dari awal.
+        const maxRevRow = db.prepare('SELECT MAX(rev) AS m FROM records').get();
+        const maxRev = maxRevRow && maxRevRow.m ? maxRevRow.m : 0;
+        db.prepare("UPDATE counter SET v = MAX(v, ?) WHERE k = 'rev'").run(maxRev);
+        bumpEpoch();
+
         db.exec('COMMIT');
 
         recordAudit(req, user, 'RESTORE_SUCCESS', 'backup', `Database berhasil dipulihkan dari file cadangan tanggal ${payload.date || 'tidak diketahui'}. Berisi ${records.length} data, ${users.length} pengguna.`);
@@ -1114,7 +1170,9 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 404, { error: 'Not found' });
   } catch (err) {
     console.error('[ZanFin API Error]', err);
-    return sendJson(res, 500, { error: err.message || 'Internal Server Error' });
+    if (res.headersSent) return;
+    const status = err.status || (err instanceof SyntaxError ? 400 : 500);
+    return sendJson(res, status, { error: err.message || 'Internal Server Error' });
   }
 });
 
