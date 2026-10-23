@@ -69,7 +69,7 @@ fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(publicDir, { recursive: true });
 
 // Output template filled with real data
-const xmlContent = buildOfficialXml('3578015505790001', 8, 2026);
+const xmlContent = buildOfficialXml('3578047105750010', 8, 2026);
 fs.writeFileSync(path.join(outDir, 'BP21_Coretax_14_Personel_Riset.xml'), xmlContent, 'utf8');
 fs.writeFileSync(path.join(publicDir, 'BP21_Coretax_14_Personel_Riset.xml'), xmlContent, 'utf8');
 

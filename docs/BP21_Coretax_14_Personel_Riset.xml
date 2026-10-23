@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Bp21Bulk xsi:noNamespaceSchemaLocation="schema.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<TIN>3578015505790001</TIN>
+	<TIN>3578047105750010</TIN>
 	<ListOfBp21>
 		<Bp21>
 			<TaxPeriodMonth>8</TaxPeriodMonth>
@@ -16,7 +16,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-017</DocumentNumber>
 			<DocumentDate>2026-08-21</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-21</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -33,7 +33,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-023</DocumentNumber>
 			<DocumentDate>2026-08-21</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-21</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -50,7 +50,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-039</DocumentNumber>
 			<DocumentDate>2026-08-21</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-21</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -67,7 +67,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-044A</DocumentNumber>
 			<DocumentDate>2026-08-21</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-21</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -84,7 +84,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-044B</DocumentNumber>
 			<DocumentDate>2026-08-21</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-21</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -101,7 +101,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-055</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -118,7 +118,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-1</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -135,7 +135,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-2</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -152,7 +152,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-3</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -169,7 +169,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-4</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -186,7 +186,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-5</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -203,7 +203,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-6</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -220,7 +220,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-7</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 		<Bp21>
@@ -237,7 +237,7 @@
 			<Document>Contract</Document>
 			<DocumentNumber>KWT-HR-056-8</DocumentNumber>
 			<DocumentDate>2026-08-30</DocumentDate>
-			<IDPlaceOfBusinessActivity>3578015505790001000000</IDPlaceOfBusinessActivity>
+			<IDPlaceOfBusinessActivity>3578047105750010000000</IDPlaceOfBusinessActivity>
 			<WithholdingDate>2026-08-30</WithholdingDate>
 		</Bp21>
 	</ListOfBp21>

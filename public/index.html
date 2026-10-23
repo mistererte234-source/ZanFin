@@ -4614,7 +4614,7 @@ function sheetExportCoretaxXML() {
     return;
   }
 
-  const savedTin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '3578015505790001';
+  const savedTin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '3578047105750010';
 
   const body = '<div class="stack" style="gap:12px">' +
     '<div class="card" style="background:linear-gradient(135deg,rgba(2,132,199,0.1),rgba(14,165,233,0.05));border-left:4px solid var(--info);padding:12px">' +
@@ -4649,11 +4649,10 @@ function sheetExportCoretaxXML() {
       '</select>') +
 
     '<div class="card" style="padding:10px 12px;background:var(--panel2)">' +
-      '<div style="font-weight:700;font-size:12px;margin-bottom:6px">Ringkasan 14 Personel Siap Impor:</div>' +
+      '<div style="font-weight:700;font-size:12px;margin-bottom:6px">📁 Proyek: ' + esc(p.name || p.id) + '</div>' +
       '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
-        '• 5 Narasumber (@ Rp 900.000) &rarr; KOP 21-100-18 (Tarif 5%)<br>' +
-        '• 1 Pengolah Data (Rp 1.540.000) &rarr; KOP 21-100-20 (Tarif 5%)<br>' +
-        '• 8 Petugas Survei (@ Rp 1.280.000) &rarr; Siap Masuk Coretax<br>' +
+        '• Total Transaksi Honor: <b>' + pays.length + ' kuitansi</b> (' + rp(pays.reduce((s, x) => s + (x.gross || 0), 0)) + ')<br>' +
+        '• Format File Otomatis: <code style="color:var(--info);font-weight:600">BP21_Coretax_DJP_' + esc((p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30)) + '_Masa[Bulan]_[Tahun].xml</code><br>' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -4748,12 +4747,15 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
   xml += '\t</ListOfBp21>\n';
   xml += '</Bp21Bulk>\n';
 
+  const projTag = (p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
+  const fileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + 'Masa' + taxMonth + '_' + taxYear + '.xml';
+
   const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'BP21_Coretax_DJP_Masa' + taxMonth + '_' + taxYear + '.xml';
+  a.download = fileName;
   a.click();
-  toast('File XML Coretax BP21 Resmi berhasil diunduh ✓');
+  toast('File ' + fileName + ' berhasil diunduh ✓');
 }
 
 function exportCoretaxXML() {
