@@ -2057,6 +2057,7 @@ let sub = null;
 let subFrom = 'lainnya';
 let sheetOk = null;
 let kasFilter = 'semua';
+let kasSearch = '';
 let timFilter = 'semua';
 let USERS = null;
 
@@ -3552,14 +3553,15 @@ function vKas() {
 
   const chips = [
     ['semua', 'Semua'],
+    ['non_honor', '🛍️ Non-Honor / Belanja'],
+    ['sewa', '🏠 Sewa Rumah & Mobil'],
+    ['honor', '💵 Honorarium'],
     ['in', 'Dana Masuk'],
     ['out', 'Semua Keluar'],
-    ['non_honor', '🛍️ Non-Honor / Belanja'],
-    ['honor', '💵 Honorarium'],
-    ['bahan', 'Bahan Lab/ATK'],
     ['perjalanan', 'Perjalanan'],
-    ['publikasi', 'Publikasi'],
-    ['ops', 'Operasional']
+    ['ops', 'Operasional'],
+    ['bahan', 'Bahan Lab/ATK'],
+    ['publikasi', 'Publikasi']
   ];
 
   let list = tx.slice();
@@ -3567,7 +3569,19 @@ function vKas() {
   else if (kasFilter === 'out') list = list.filter(t => t.dir === 'out');
   else if (kasFilter === 'honor') list = list.filter(t => t.cat === 'honor');
   else if (kasFilter === 'non_honor') list = list.filter(t => t.dir === 'out' && t.cat !== 'honor');
+  else if (kasFilter === 'sewa') list = list.filter(t => (t.note && t.note.toLowerCase().includes('sewa')) || t.id.includes('sewa') || t.id.includes('mobil') || t.id.includes('motor'));
   else if (kasFilter !== 'semua') list = list.filter(t => t.cat === kasFilter);
+
+  if (kasSearch) {
+    const q = kasSearch.toLowerCase().trim();
+    list = list.filter(t =>
+      (t.note && t.note.toLowerCase().includes(q)) ||
+      (t.ref && t.ref.toLowerCase().includes(q)) ||
+      (t.vendor && t.vendor.toLowerCase().includes(q)) ||
+      (CAT_IN[t.cat] && CAT_IN[t.cat].toLowerCase().includes(q)) ||
+      (CAT_OUT[t.cat] && CAT_OUT[t.cat].toLowerCase().includes(q))
+    );
+  }
 
   list.sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
 
@@ -3618,6 +3632,12 @@ function vKas() {
       '<button class="btn ink block" style="flex:1" onclick="sheetKasOut()">− Kas Keluar</button>' +
     '</div>' +
 
+    /* Search Bar Transaksi */
+    '<div style="position:relative">' +
+      '<input type="search" id="kas-search-box" value="' + esc(kasSearch) + '" placeholder="🔍 Cari transaksi (contoh: sewa, mobil, posko, konsumsi)..." oninput="setKasSearch(this.value)" style="width:100%;padding:9px 36px 9px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel2);font-size:13px;color:var(--ink);box-sizing:border-box">' +
+      (kasSearch ? '<button onclick="setKasSearch(\'\')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:4px">✕</button>' : '') +
+    '</div>' +
+
     '<div class="fchips">' +
       chips.map(([k, l]) =>
         '<button class="fchip" onclick="setKasFilter(\'' + k + '\')" aria-pressed="' + (kasFilter === k) + '">' + l + '</button>'
@@ -3626,7 +3646,7 @@ function vKas() {
 
     '<div class="card list">' +
       (!Object.keys(byDate).length
-        ? '<p class="muted" style="padding:24px 0;text-align:center">Tidak ada transaksi untuk filter ini.</p>'
+        ? '<p class="muted" style="padding:24px 0;text-align:center">Tidak ada transaksi untuk filter / pencarian ini.</p>'
         : Object.entries(byDate).map(([d, arr]) =>
             '<div class="dayhd">' + fdl(d) + '</div>' +
             arr.map(t =>
@@ -3661,6 +3681,18 @@ function vKas() {
 function setKasFilter(f) {
   kasFilter = f;
   render();
+}
+
+function setKasSearch(val) {
+  kasSearch = val;
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('kas-search-box');
+    if (el) {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, 10);
 }
 
 function sheetMekanismeHonor() {
