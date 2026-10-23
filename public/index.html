@@ -3847,45 +3847,85 @@ function sheetTxnDetail(id) {
     '<div class="stack">' +
       '<div class="card" style="background:var(--panel2)">' +
         '<div class="lab">' + (t.dir === 'in' ? 'Kas Masuk' : 'Kas Keluar') + '</div>' +
-        '<div class="val ' + (t.dir === 'in' ? 'in-c' : 'out-c') + '">' + (t.dir === 'in' ? '+' : '−') + rpC(t.amount) + '</div>' +
+        '<div class="val ' + (t.dir === 'in' ? 'in-c' : (t.cat === 'honor' ? 'info-c' : 'out-c')) + '">' + (t.dir === 'in' ? '+' : '−') + rpC(t.amount) + '</div>' +
         '<div class="sub">' + fdl(t.date) + '</div>' +
       '</div>' +
       fld('Kategori', '<div><b>' + (CAT_IN[t.cat] || CAT_OUT[t.cat] || t.cat) + '</b></div>') +
+      (t.vendor ? fld('Penyedia / Pemilik (Vendor)', '<div><b>' + esc(t.vendor) + '</b></div>') : '') +
+      (t.tax_pph42 ? fld('Pajak PPh 4(2) Sewa Gedung (10%)', '<div style="font-weight:750;color:var(--info)">Rp ' + fmtN(t.tax_pph42) + ' <span class="muted small">(Bruto: ' + rpC(t.gross) + ')</span></div>') : '') +
+      (t.tax_pph23 ? fld('Pajak PPh 23 Sewa Kendaraan (2%)', '<div style="font-weight:750;color:var(--info)">Rp ' + fmtN(t.tax_pph23) + ' <span class="muted small">(Bruto: ' + rpC(t.gross) + ')</span></div>') : '') +
       fld('No Kuitansi / Bukti', '<div>' + esc(t.ref || '—') + '</div>') +
       fld('Keterangan', '<div>' + esc(t.note || '—') + '</div>') +
       fld('Status Berkas SPJ', '<div>' + (t.spj_ok ? '<span class="pill ok">✓ Berkas Fisik Lengkap</span>' : '<span class="pill bad">⚠️ Perlu Bukti Fisik</span>') + '</div>') +
 
-      /* Lampiran Bukti Nota / Kuitansi */
+      /* Lampiran Bukti Nota / Kuitansi / KTP */
       '<div class="card stack" style="gap:8px;background:var(--panel2)">' +
-        '<div class="lab" style="font-weight:750">Lampiran Bukti Digital (Nota / Transfer)</div>' +
+        '<div class="row between" style="align-items:center">' +
+          '<div class="lab" style="font-weight:750">Lampiran Bukti Digital (KTP / Nota / Kuitansi)</div>' +
+          (t.proof ? '<span class="pill ok" style="font-size:9.5px;padding:2px 6px">Tersimpan</span>' : '') +
+        '</div>' +
         (t.proof ?
           '<div class="row" style="gap:12px;align-items:center">' +
             (t.proof_type === 'image' || t.proof.startsWith('data:image') ?
-              '<img src="' + esc(t.proof) + '" alt="Nota" style="width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="viewProofModal(\'Bukti Nota: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'nota.jpg') + '\')">' :
+              '<img src="' + esc(t.proof) + '" alt="Bukti" style="width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="viewProofModal(\'Bukti: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'bukti.jpg') + '\')">' :
               '<div style="width:64px;height:64px;border-radius:10px;background:rgba(225,29,72,0.12);color:var(--bad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;flex-shrink:0">PDF</div>'
             ) +
             '<div style="flex:1;min-width:0">' +
-              '<b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.proof_name || 'File Bukti Nota') + '</b>' +
-              '<div class="small ok" style="font-weight:700">✓ Bukti digital tersimpan</div>' +
+              '<b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.proof_name || 'File Bukti') + '</b>' +
+              '<div class="small ok" style="font-weight:700">✓ Bukti digital tersimpan di arsip</div>' +
               '<div class="row" style="gap:10px;margin-top:6px">' +
-                '<button type="button" class="small link" style="font-weight:700" onclick="viewProofModal(\'Bukti Nota: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'nota.jpg') + '\')">🔍 Buka Foto</button>' +
-                '<a href="' + esc(t.proof) + '" download="' + esc(t.proof_name || 'bukti_nota.jpg') + '" class="small link" style="font-weight:700">⬇️ Unduh</a>' +
+                '<button type="button" class="small link" style="font-weight:700" onclick="viewProofModal(\'Bukti: ' + esc(t.ref || '') + '\', \'' + esc(t.proof) + '\', \'' + esc(t.proof_type || 'image') + '\', \'' + esc(t.proof_name || 'bukti.jpg') + '\')">🔍 Buka Foto</button>' +
+                '<a href="' + esc(t.proof) + '" download="' + esc(t.proof_name || 'bukti.jpg') + '" class="small link" style="font-weight:700">⬇️ Unduh</a>' +
                 '<button type="button" class="small link" style="color:var(--info);font-weight:700" onclick="attachProofToTxn(\'' + t.id + '\')">Ganti</button>' +
                 '<button type="button" class="small link" style="color:var(--bad);font-weight:700" onclick="removeProofFromTxn(\'' + t.id + '\')">Hapus</button>' +
               '</div>' +
             '</div>' +
           '</div>' :
           '<div style="padding:4px 0">' +
-            '<div class="small muted" style="margin-bottom:8px">⚠️ Belum ada foto nota / bukti kuitansi digital untuk transaksi ini.</div>' +
-            '<button class="btn sm pri" onclick="attachProofToTxn(\'' + t.id + '\')">📷 Unggah Bukti Nota Sekarang</button>' +
+            '<div class="small muted" style="margin-bottom:8px">⚠️ Belum ada foto KTP / nota kuitansi yang diunggah untuk transaksi ini.</div>' +
+            '<button class="btn sm pri" onclick="attachProofToTxn(\'' + t.id + '\')">📷 Unggah Foto KTP / Nota Sekarang</button>' +
           '</div>'
         ) +
       '</div>' +
 
-      '<button class="btn bad block" style="margin-top:10px" onclick="deleteTxn(\'' + t.id + '\')">Hapus / Batalkan Transaksi</button>' +
+      '<div class="row" style="gap:8px;margin-top:4px">' +
+        '<button class="btn block" style="flex:1" onclick="sheetTxnEdit(\'' + t.id + '\')">✏️ Edit Data &amp; NIK Pemilik</button>' +
+        '<button class="btn bad sm" style="padding:0 14px" onclick="deleteTxn(\'' + t.id + '\')" title="Hapus Transaksi">Hapus</button>' +
+      '</div>' +
     '</div>',
     'Tutup',
     () => closeSheet()
+  );
+}
+
+function sheetTxnEdit(id) {
+  const t = S.txns.find(x => x.id === id);
+  if (!t) return;
+  sheet('Edit Transaksi & Identitas Pemilik',
+    '<div class="stack">' +
+      fld('Tanggal Transaksi', '<input type="date" id="et-date" value="' + (t.date || today()) + '">') +
+      fld('Nama Pemilik / Penyedia (Vendor)', '<input id="et-vendor" value="' + esc(t.vendor || '') + '" placeholder="Contoh: Bpk. Sugiono (Pemilik Posko)">') +
+      fld('Keterangan & NIK Pemilik KTP', '<textarea id="et-note" placeholder="Catatan transaksi atau NIK KTP pemilik">' + esc(t.note || '') + '</textarea>', 'Bisa cantumkan NIK KTP 16 digit pemilik di sini agar tersimpan rapi') +
+      fld('Nomor Kuitansi / Referensi', '<input id="et-ref" value="' + esc(t.ref || '') + '" placeholder="KWT-001">') +
+      '<div class="grid2">' +
+        fld('Nominal Netto Kas Keluar (Rp)', moneyIn('et-amount', t.amount)) +
+        fld('Nominal Bruto (Rp)', moneyIn('et-gross', t.gross || t.amount)) +
+      '</div>' +
+    '</div>',
+    'Simpan Perubahan',
+    () => {
+      t.date = $('#et-date').value || t.date;
+      t.vendor = $('#et-vendor').value.trim();
+      t.note = $('#et-note').value.trim();
+      t.ref = $('#et-ref').value.trim();
+      t.amount = parseN($('#et-amount').value) || t.amount;
+      t.gross = parseN($('#et-gross').value) || t.gross;
+      saveState();
+      closeSheet();
+      toast('Data transaksi berhasil disimpan ✓');
+      render();
+      setTimeout(() => sheetTxnDetail(t.id), 200);
+    }
   );
 }
 
