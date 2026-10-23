@@ -4702,18 +4702,23 @@ window.updateXmlExportSummary = function() {
   }
 
   let skippedCount = 0;
-  if (excludeSelf && currentTin) {
+  if (excludeSelf) {
     const beforeCount = targetPays.length;
     targetPays = targetPays.filter(pay => {
       const w = S.workers.find(x => x.id === pay.wid);
       const rawTin = String((w && (w.nik || w.npwp)) || '').replace(/\D/g, '');
-      return rawTin !== currentTin;
+      const isKetua = (currentTin && rawTin === currentTin) ||
+                      (rawTin === '3578047105750010') ||
+                      (w && w.role && w.role.toLowerCase().includes('ketua')) ||
+                      (w && w.name && w.name.toLowerCase().includes('nadhiroh'));
+      return !isKetua;
     });
     skippedCount = beforeCount - targetPays.length;
   }
 
   const projTag = (p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
-  const fileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + selYear + '.xml';
+  const xmlFileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + selYear + '.xml';
+  const csvFileName = 'Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + selYear + '.csv';
   const totalGross = targetPays.reduce((s, x) => s + (x.gross || 0), 0);
 
   const summaryEl = $('#xml-export-summary');
@@ -4730,17 +4735,18 @@ window.updateXmlExportSummary = function() {
         '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
           '• Siap Diekspor: <b style="color:var(--ok)">' + targetPays.length + ' kuitansi</b> (' + rp(totalGross) + ')' +
           (skippedCount ? ' <span style="color:var(--info);font-size:10.5px">(' + skippedCount + ' honor Ketua dikecualikan agar tidak ditolak Coretax ✓)</span>' : '') + '<br>' +
-          '• Format File Otomatis: <code style="color:var(--info);font-weight:600">' + esc(fileName) + '</code><br>' +
+          '• File XML: <code style="color:var(--info);font-weight:600">' + esc(xmlFileName) + '</code><br>' +
+          '• File CSV: <code style="color:var(--ok);font-weight:600">' + esc(csvFileName) + '</code><br>' +
         '</div>';
     }
   }
 };
 
-function sheetExportCoretaxXML() {
+function sheetExportCoretax(defaultFormat = 'xml') {
   const p = P();
   const pays = payrollsOf(p.id);
   if (!pays.length) {
-    toast('Belum ada pemotongan honor untuk diekspor ke XML');
+    toast('Belum ada pemotongan honor untuk diekspor ke Coretax');
     return;
   }
 
@@ -4816,7 +4822,7 @@ function sheetExportCoretaxXML() {
     '<div class="card" style="padding:10px 12px;background:var(--panel2);border:1px solid var(--border)">' +
       '<label style="display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;cursor:pointer;margin:0">' +
         '<input type="checkbox" id="xml-exclude-self" checked onchange="updateXmlExportSummary()" style="width:17px;height:17px;cursor:pointer">' +
-        '<span>🛡️ Kecualikan Honor Ketua Peneliti dari Ekspor BP21</span>' +
+        '<span>🛡️ Kecualikan Honor Ketua Peneliti dari Ekspor BP21 &amp; CSV</span>' +
       '</label>' +
       '<p class="tiny muted" style="margin:4px 0 0 26px;line-height:1.4">' +
         'Sesuai regulasi Coretax DJP: Pemotong dilarang menerbitkan bukti potong atas dirinya sendiri. Honor Ketua dilaporkan terpisah di SPT Tahunan pribadi atau dipotong institusi kampus.' +
@@ -4849,30 +4855,47 @@ function sheetExportCoretaxXML() {
     '<div id="xml-export-summary" class="card" style="padding:10px 12px;background:var(--panel2)">' +
       // Terisi otomatis lewat updateXmlExportSummary
     '</div>' +
+
+    '<div class="row" style="gap:8px;margin-top:6px">' +
+      '<button type="button" class="btn pri block" style="flex:1.2;background:linear-gradient(135deg,#0284c7,#0369a1);font-weight:750" onclick="triggerCoretaxDownload(\'xml\')">⚡ Unduh File XML (BP21)</button>' +
+      '<button type="button" class="btn block" style="flex:1;font-weight:700" onclick="triggerCoretaxDownload(\'csv\')">📊 Unduh File CSV (e-Bupot)</button>' +
+    '</div>' +
   '</div>';
 
-  sheet('Ekspor XML Coretax BP21 Resmi', body, 'Unduh File XML Sekarang', () => {
-    const rawTin = ($('#xml-tin').value || '').replace(/\D/g, '');
-    if (!rawTin || rawTin.length < 15) {
-      alert('NPWP / NIK Pemotong wajib minimal 15 atau 16 digit angka!\n\nSilakan pilih "Pasang NIK Ketua Peneliti" atau ketik NIK akun Coretax Anda.');
-      return;
-    }
-    const month = $('#xml-month').value || '8';
-    const year = parseInt($('#xml-year').value, 10) || (p.year || 2026);
-    const docType = $('#xml-doc').value || 'Contract';
-    const enumKopChoice = $('#xml-enum-kop').value || 'coretax_05';
-    const excludeSelf = $('#xml-exclude-self') ? $('#xml-exclude-self').checked : true;
-
-    p.tin = rawTin;
-    localStorage.setItem('zanfin_coretax_tin', rawTin);
-    saveState();
-
-    downloadBp21Xml(rawTin, month, year, docType, enumKopChoice, excludeSelf);
-    closeSheet();
-  });
+  const modalTitle = (defaultFormat === 'csv') ? 'Ekspor CSV Coretax e-Bupot Resmi' : 'Ekspor XML Coretax BP21 Resmi';
+  sheet(modalTitle, body, 'Tutup', () => closeSheet(), 'outline');
 
   setTimeout(updateXmlExportSummary, 50);
 }
+
+function sheetExportCoretaxXML() {
+  sheetExportCoretax('xml');
+}
+
+window.triggerCoretaxDownload = function(format) {
+  const p = P();
+  const rawTin = ($('#xml-tin').value || '').replace(/\D/g, '');
+  if (!rawTin || rawTin.length < 15) {
+    alert('NPWP / NIK Pemotong wajib minimal 15 atau 16 digit angka!\n\nSilakan pilih "Pasang NIK Ketua Peneliti" atau ketik NIK akun Coretax Anda.');
+    return;
+  }
+  const month = $('#xml-month').value || '8';
+  const year = parseInt($('#xml-year').value, 10) || (p.year || 2026);
+  const docType = $('#xml-doc').value || 'Contract';
+  const enumKopChoice = $('#xml-enum-kop').value || 'coretax_05';
+  const excludeSelf = $('#xml-exclude-self') ? $('#xml-exclude-self').checked : true;
+
+  p.tin = rawTin;
+  localStorage.setItem('zanfin_coretax_tin', rawTin);
+  saveState();
+
+  if (format === 'csv') {
+    downloadBp21Csv(rawTin, month, year, docType, enumKopChoice, excludeSelf);
+  } else {
+    downloadBp21Xml(rawTin, month, year, docType, enumKopChoice, excludeSelf);
+  }
+  closeSheet();
+};
 
 function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf) {
   const p = P();
@@ -4905,7 +4928,11 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, exclude
     targetPays = targetPays.filter(pay => {
       const w = S.workers.find(x => x.id === pay.wid);
       const rawTin = String((w && (w.nik || w.npwp)) || '').replace(/\D/g, '');
-      return rawTin !== cleanTin;
+      const isKetua = (cleanTin && rawTin === cleanTin) ||
+                      (rawTin === '3578047105750010') ||
+                      (w && w.role && w.role.toLowerCase().includes('ketua')) ||
+                      (w && w.name && w.name.toLowerCase().includes('nadhiroh'));
+      return !isKetua;
     });
   }
 
@@ -4989,37 +5016,106 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, exclude
   toast('File ' + fileName + ' (' + targetPays.length + ' kuitansi) berhasil diunduh ✓');
 }
 
-function exportCoretaxXML() {
-  sheetExportCoretaxXML();
-}
+function downloadBp21Csv(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf) {
+  const p = P();
+  const allPays = payrollsOf(p.id);
 
-function exportCoretaxCSV() {
-  const pays = payrollsOf(P().id);
+  let targetPays = allPays;
+  let monthTag = 'SemuaMasa';
+
+  if (taxMonth && taxMonth !== 'all') {
+    const mNum = parseInt(taxMonth, 10) || 8;
+    monthTag = 'Masa' + mNum;
+    const filtered = allPays.filter(pay => {
+      const dParts = String(pay.date || '').split('-');
+      return (parseInt(dParts[1], 10) || 8) === mNum;
+    });
+    if (filtered.length) {
+      targetPays = filtered;
+    }
+  }
+
+  const cleanTin = String(tin || p.tin || p.npwp || '3578047105750010').replace(/\D/g, '');
+
+  let skippedCount = 0;
+  if (excludeSelf !== false) {
+    const beforeCount = targetPays.length;
+    targetPays = targetPays.filter(pay => {
+      const w = S.workers.find(x => x.id === pay.wid);
+      const rawTin = String((w && (w.nik || w.npwp)) || '').replace(/\D/g, '');
+      const isKetua = (cleanTin && rawTin === cleanTin) ||
+                      (rawTin === '3578047105750010') ||
+                      (w && w.role && w.role.toLowerCase().includes('ketua')) ||
+                      (w && w.name && w.name.toLowerCase().includes('nadhiroh'));
+      return !isKetua;
+    });
+    skippedCount = beforeCount - targetPays.length;
+  }
+
+  if (!targetPays.length) {
+    alert('Tidak ada transaksi kuitansi yang tersisa untuk diekspor ke CSV (kuitansi terpilih milik Pemotong sendiri).');
+    return;
+  }
+
   let csv = 'Kode Objek Pajak,Nama Penerima,NIK (16 Digit),NPWP,Dasar Pengenaan Pajak (DPP),Tarif,Jumlah PPh 21,Dokumen Dasar,Nomor Dokumen,Tanggal Dokumen,Status Dokumen Fisik\n';
-  pays.forEach(pay => {
+  targetPays.forEach(pay => {
     const w = S.workers.find(x => x.id === pay.wid);
     const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
-    const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
+    const isPengolah = w && w.role.toLowerCase().includes('pengolah');
+
+    let kop = '21-100-18';
+    let rate = '5.0%';
+
+    if (isPengolah) {
+      kop = '21-100-20';
+      rate = '5.0%';
+    } else if (isEnum) {
+      if (enumKopChoice === 'jasa_5') {
+        kop = '21-100-20';
+        rate = '5.0%';
+      } else {
+        kop = '21-100-24';
+        rate = '0.5%';
+      }
+    }
+
+    const rawTin = String((w && (w.nik || w.npwp)) || '').replace(/\D/g, '');
+    const counterpartTin = rawTin.length >= 15 ? rawTin : rawTin.padStart(16, '0');
+
     csv += [
       kop,
       '"' + (w ? w.name : '') + '"',
-      w ? w.nik : '',
-      w ? w.npwp : '',
+      "'" + counterpartTin,
+      w && w.npwp ? '"' + w.npwp + '"' : "''",
       pay.gross,
-      (pay.tax_rate * 100).toFixed(1) + '%',
+      rate,
       pay.tax_amt,
-      '"Kuitansi"',
-      pay.ref,
-      pay.date,
+      '"' + (docType || 'Contract') + '"',
+      '"' + (pay.ref || ('KWT-' + pay.id)) + '"',
+      pay.date || today(),
       pay.proof ? '"Ada Bukti (' + (pay.proof_name || 'Tersimpan') + ')"' : '"Belum Upload Slip"'
     ].join(',') + '\n';
   });
+
+  const projTag = (p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
+  const fileName = 'Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + (taxYear || p.year || 2026) + '.csv';
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'Coretax_DJP_PPh21_' + today() + '.csv';
+  a.download = fileName;
   a.click();
-  toast('File CSV Coretax siap diimpor ke e-Bupot');
+
+  const skipNote = skippedCount ? ' (' + skippedCount + ' honor Ketua dikecualikan ✓)' : '';
+  toast('File CSV ' + fileName + ' (' + targetPays.length + ' personel' + skipNote + ') berhasil diunduh ✓');
+}
+
+function exportCoretaxXML() {
+  sheetExportCoretax('xml');
+}
+
+function exportCoretaxCSV() {
+  sheetExportCoretax('csv');
 }
 
 /* ==========================================================================
