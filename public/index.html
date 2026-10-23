@@ -4650,6 +4650,49 @@ window.updateNitkuHint = function() {
   }
 };
 
+window.updateXmlExportSummary = function() {
+  const p = P();
+  const allPays = payrollsOf(p.id);
+  const selMonth = $('#xml-month') ? $('#xml-month').value : '8';
+  const selYear = ($('#xml-year') ? $('#xml-year').value : '') || (p.year || 2026);
+
+  let targetPays = allPays;
+  let labelMasa = 'Semua Masa';
+  let monthTag = 'SemuaMasa';
+
+  if (selMonth !== 'all') {
+    const mNum = parseInt(selMonth, 10) || 8;
+    targetPays = allPays.filter(pay => {
+      const dParts = String(pay.date || '').split('-');
+      return (parseInt(dParts[1], 10) || 8) === mNum;
+    });
+    labelMasa = 'Masa Pajak ' + mNum;
+    monthTag = 'Masa' + mNum;
+  }
+
+  const projTag = (p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
+  const fileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + selYear + '.xml';
+  const totalGross = targetPays.reduce((s, x) => s + (x.gross || 0), 0);
+
+  const summaryEl = $('#xml-export-summary');
+  if (summaryEl) {
+    if (targetPays.length === 0) {
+      summaryEl.innerHTML = 
+        '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--err)">⚠️ Tidak ada kuitansi di ' + labelMasa + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
+          'Silakan pilih bulan yang memiliki tanda 🔥 kuitansi, atau pilih opsi <b>Semua Masa</b>.' +
+        '</div>';
+    } else {
+      summaryEl.innerHTML = 
+        '<div style="font-weight:700;font-size:12px;margin-bottom:6px">📁 Proyek: ' + esc(p.name || p.id) + ' &bull; <span style="color:var(--info)">' + labelMasa + '</span></div>' +
+        '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
+          '• Siap Diekspor: <b style="color:var(--ok)">' + targetPays.length + ' kuitansi</b> (' + rp(totalGross) + ')<br>' +
+          '• Format File Otomatis: <code style="color:var(--info);font-weight:600">' + esc(fileName) + '</code><br>' +
+        '</div>';
+    }
+  }
+};
+
 function sheetExportCoretaxXML() {
   const p = P();
   const pays = payrollsOf(p.id);
@@ -4677,10 +4720,33 @@ function sheetExportCoretaxXML() {
   if (!currentTin) currentTin = KETUA_NIK;
   const isKetua = (currentTin === KETUA_NIK);
 
+  // Hitung sebaran kuitansi per bulan
+  const monthCounts = {};
+  pays.forEach(pay => {
+    const dParts = String(pay.date || '').split('-');
+    const m = parseInt(dParts[1], 10) || 8;
+    monthCounts[m] = (monthCounts[m] || 0) + 1;
+  });
+
+  const monthNames = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const activeMonths = Object.keys(monthCounts).map(Number).sort((a,b) => a - b);
+  const defaultMonth = activeMonths.length ? activeMonths[0] : 8;
+
+  let monthOptionsHtml = '';
+  for (let m = 1; m <= 12; m++) {
+    const cnt = monthCounts[m] || 0;
+    const badge = cnt ? ' — 🔥 ' + cnt + ' kuitansi' : '';
+    const isSelected = (m === defaultMonth);
+    monthOptionsHtml += '<option value="' + m + '" ' + (isSelected ? 'selected' : '') + '>' +
+      'Bulan ' + m + ' (' + monthNames[m-1] + ')' + badge +
+    '</option>';
+  }
+  monthOptionsHtml += '<option value="all">📦 Semua Bulan Sekaligus (' + pays.length + ' kuitansi — Gabungan)</option>';
+
   const body = '<div class="stack" style="gap:12px">' +
     '<div class="card" style="background:linear-gradient(135deg,rgba(2,132,199,0.1),rgba(14,165,233,0.05));border-left:4px solid var(--info);padding:12px">' +
       '<b style="font-size:12.5px;color:var(--info)">🏛️ Sesuai Validasi Coretax DJP (Error Resolved ✓)</b>' +
-      '<p class="tiny muted" style="margin:4px 0 0;line-height:1.45">ID Tempat Usaha diformat 22 digit resmi (<code>[NIK]+000000</code>) dan tarif enumerator otomatis disesuaikan dengan aturan validasi Coretax.</p>' +
+      '<p class="tiny muted" style="margin:4px 0 0;line-height:1.45">ID Tempat Usaha diformat 22 digit resmi (<code>[NIK]+000000</code>) dan kuitansi otomatis difilter per Masa Pajak agar tidak bentrok di Coretax.</p>' +
     '</div>' +
 
     fld('Pilihan Akun Pemotong Pajak (Coretax DJP)',
@@ -4705,12 +4771,13 @@ function sheetExportCoretaxXML() {
       '</div>') +
 
     '<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-      fld('Masa Pajak (Bulan)',
-        '<select id="xml-month">' +
-          [1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="' + m + '" ' + (m === 8 ? 'selected' : '') + '>Bulan ' + m + ' (' + ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][m-1] + ')</option>').join('') +
-        '</select>') +
+      fld('Masa Pajak (Bulan Pelaporan)',
+        '<select id="xml-month" onchange="updateXmlExportSummary()">' +
+          monthOptionsHtml +
+        '</select>',
+        'Pilih masa pajak. Sistem akan otomatis memfilter kuitansi sesuai tanggal kuitansinya.') +
       fld('Tahun Pajak',
-        '<input id="xml-year" value="' + (p.year || 2026) + '" class="num" maxlength="4">') +
+        '<input id="xml-year" value="' + (p.year || 2026) + '" class="num" maxlength="4" oninput="updateXmlExportSummary()">') +
     '</div>' +
 
     fld('Skema Tarif &amp; Kode Pajak Enumerator',
@@ -4726,23 +4793,19 @@ function sheetExportCoretaxXML() {
         '<option value="PaymentProof">PaymentProof (Bukti Pembayaran)</option>' +
       '</select>') +
 
-    '<div class="card" style="padding:10px 12px;background:var(--panel2)">' +
-      '<div style="font-weight:700;font-size:12px;margin-bottom:6px">📁 Proyek: ' + esc(p.name || p.id) + '</div>' +
-      '<div style="font-size:11px;color:var(--muted);line-height:1.5">' +
-        '• Total Transaksi Honor: <b>' + pays.length + ' kuitansi</b> (' + rp(pays.reduce((s, x) => s + (x.gross || 0), 0)) + ')<br>' +
-        '• Format File Otomatis: <code style="color:var(--info);font-weight:600">BP21_Coretax_DJP_' + esc((p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30)) + '_Masa[Bulan]_[Tahun].xml</code><br>' +
-      '</div>' +
+    '<div id="xml-export-summary" class="card" style="padding:10px 12px;background:var(--panel2)">' +
+      // Terisi otomatis lewat updateXmlExportSummary
     '</div>' +
   '</div>';
 
   sheet('Ekspor XML Coretax BP21 Resmi', body, 'Unduh File XML Sekarang', () => {
     const rawTin = ($('#xml-tin').value || '').replace(/\D/g, '');
     if (!rawTin || rawTin.length < 15) {
-      alert('NPWP / NIK Pemotong wajib minimal 15 atau 16 digit angka!');
+      alert('NPWP / NIK Pemotong wajib minimal 15 atau 16 digit angka!\n\nSilakan pilih "Pasang NIK Ketua Peneliti" atau ketik NIK akun Coretax Anda.');
       return;
     }
-    const month = parseInt($('#xml-month').value, 10) || 8;
-    const year = parseInt($('#xml-year').value, 10) || 2026;
+    const month = $('#xml-month').value || '8';
+    const year = parseInt($('#xml-year').value, 10) || (p.year || 2026);
     const docType = $('#xml-doc').value || 'Contract';
     const enumKopChoice = $('#xml-enum-kop').value || 'coretax_05';
 
@@ -4753,11 +4816,32 @@ function sheetExportCoretaxXML() {
     downloadBp21Xml(rawTin, month, year, docType, enumKopChoice);
     closeSheet();
   });
+
+  setTimeout(updateXmlExportSummary, 50);
 }
 
 function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
   const p = P();
-  const pays = payrollsOf(p.id);
+  const allPays = payrollsOf(p.id);
+
+  let targetPays = allPays;
+  let monthTag = 'SemuaMasa';
+  let defaultM = 8;
+
+  if (taxMonth !== 'all') {
+    const mNum = parseInt(taxMonth, 10) || 8;
+    defaultM = mNum;
+    monthTag = 'Masa' + mNum;
+    const filtered = allPays.filter(pay => {
+      const dParts = String(pay.date || '').split('-');
+      return (parseInt(dParts[1], 10) || 8) === mNum;
+    });
+    if (filtered.length) {
+      targetPays = filtered;
+    } else {
+      toast('Perhatian: Tidak ada kuitansi di bulan ' + mNum + ', mengekspor seluruh kuitansi.');
+    }
+  }
 
   const cleanTin = String(tin).replace(/\D/g, '');
   const idPlace = (cleanTin + '000000').slice(0, 22);
@@ -4767,7 +4851,7 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
   xml += '\t<TIN>' + cleanTin + '</TIN>\n';
   xml += '\t<ListOfBp21>\n';
 
-  pays.forEach(pay => {
+  targetPays.forEach(pay => {
     const w = S.workers.find(x => x.id === pay.wid);
     const rawTin = String((w && (w.nik || w.npwp)) || '0000000000000000').replace(/\D/g, '');
     const counterpartTin = rawTin.length >= 15 ? rawTin : rawTin.padStart(16, '0');
@@ -4799,7 +4883,8 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
     }
 
     const dateParts = String(pay.date || today()).split('-');
-    const m = taxMonth || parseInt(dateParts[1], 10) || 8;
+    // Selaraskan TaxPeriodMonth dengan masa pajak yang dipilih agar 100% konsisten di Coretax
+    const m = (taxMonth === 'all') ? (parseInt(dateParts[1], 10) || 8) : defaultM;
     const y = taxYear || parseInt(dateParts[0], 10) || 2026;
     const docDate = (dateParts.length === 3) ? dateParts.join('-') : today();
 
@@ -4826,14 +4911,14 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice) {
   xml += '</Bp21Bulk>\n';
 
   const projTag = (p.name || p.id || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
-  const fileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + 'Masa' + taxMonth + '_' + taxYear + '.xml';
+  const fileName = 'BP21_Coretax_DJP_' + (projTag ? projTag + '_' : '') + monthTag + '_' + taxYear + '.xml';
 
   const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = fileName;
   a.click();
-  toast('File ' + fileName + ' berhasil diunduh ✓');
+  toast('File ' + fileName + ' (' + targetPays.length + ' kuitansi) berhasil diunduh ✓');
 }
 
 function exportCoretaxXML() {
