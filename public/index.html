@@ -1418,7 +1418,7 @@ function getRealResearchSeed() {
         pid: pid,
         name: 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.',
         role: 'Ketua Peneliti (PI)',
-        nik: '3578014502680001',
+        nik: '3578047105750010',
         npwp: '07.123.456.7-604.000',
         golongan: 'pns_iv',
         tarif: 0,
@@ -2148,6 +2148,10 @@ function sanitizeAllData() {
     for (const w of S.workers) {
       if (w.name && (FAKE_TITLE_SNIPPETS.some(f => w.name.includes(f)) || (w.name.includes('Nadhiroh') && !w.name.includes('Siti Rahayu')))) {
         w.name = REAL_LEADER;
+        migrated = true;
+      }
+      if (w.name && w.name.includes('Siti Rahayu') && (!w.nik || w.nik === '3578014502680001' || w.nik === '3578015505790001')) {
+        w.nik = '3578047105750010';
         migrated = true;
       }
     }
@@ -4545,6 +4549,7 @@ function vPajak() {
   const p = P();
   const pjk = totalPajak(p.id);
   const pays = payrollsOf(p.id);
+  const kd = getKetuaData('current');
 
   return '<div class="stack">' +
     backBar('Pajak &amp; Coretax DJP') +
@@ -4570,6 +4575,29 @@ function vPajak() {
       '</div>' +
     '</div>' +
 
+    '<div class="card" style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.06));border:1.5px solid rgba(16,185,129,0.35);padding:14px 16px;border-radius:14px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:18px">👩‍💼</span>' +
+          '<b style="font-size:13px;color:var(--ok)">Rekap Pajak Ketua Peneliti (SPT Tahunan Pribadi)</b>' +
+        '</div>' +
+        '<span class="pill ok" style="font-size:10px;padding:2px 8px;font-weight:700">Form 1770 / 1770 S</span>' +
+      '</div>' +
+      '<p class="small muted" style="margin:0 0 10px;line-height:1.5">' +
+        'Aturan Coretax DJP melarang pemotong menerbitkan BP21 atas dirinya sendiri (<i>CounterpartTin ≠ Pemotong</i>). Khusus honorarium <b>' + esc(kd.name) + '</b>, data dipisahkan sebagai lampiran sah pelaporan SPT Tahunan pribadi beliau.' +
+      '</p>' +
+      '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;font-size:12px">' +
+        '<div><span class="muted tiny">Total Bruto Ketua:</span><br><b style="font-size:13px">' + rpC(kd.totalGross) + '</b></div>' +
+        '<div><span class="muted tiny">PPh 21 (Kredit Pajak):</span><br><b style="font-size:13px;color:var(--warning)">' + rpC(kd.totalTax) + '</b></div>' +
+        '<div><span class="muted tiny">Dasar Norma (DPP 50%):</span><br><b style="font-size:12.5px;color:var(--info)">' + rpC(kd.dpp) + '</b></div>' +
+        '<div><span class="muted tiny">Kuitansi Tercatat:</span><br><b style="font-size:12.5px;color:var(--ok)">' + kd.pays.length + ' kuitansi</b></div>' +
+      '</div>' +
+      '<div class="row" style="gap:8px">' +
+        '<button class="btn ok block" style="flex:1.2;background:linear-gradient(135deg,#059669,#047857);color:#fff;border-color:transparent;font-weight:750" onclick="sheetRekapSptKetua(\'current\')">📄 Buka Rekap Pajak Ketua</button>' +
+        '<button class="btn block" style="flex:0.8" onclick="exportRekapKetuaCSV(\'current\')">📥 Unduh CSV</button>' +
+      '</div>' +
+    '</div>' +
+
     '<div class="row" style="gap:8px">' +
       '<button class="btn block" style="flex:1" onclick="exportPajakExcel()">📊 Unduh Rekap Pajak (Excel)</button>' +
       '<a href="/docs/Panduan_eBupot_Coretax_ZanFin.pdf" target="_blank" class="btn block" style="flex:1;text-decoration:none;text-align:center;border-left:4px solid var(--info)">📖 Panduan e-Bupot (.pdf)</a>' +
@@ -4588,10 +4616,11 @@ function vPajak() {
           : pays.map(pay => {
               const w = S.workers.find(x => x.id === pay.wid);
               const isEnum = w && (w.role.toLowerCase().includes('survei') || w.role.toLowerCase().includes('enumerator'));
+              const isKetua = w && ((w.role && w.role.toLowerCase().includes('ketua')) || (w.nik && w.nik.replace(/\D/g, '') === '3578047105750010'));
               const kop = isEnum ? '21-100-24' : (w && w.role.toLowerCase().includes('pengolah') ? '21-100-20' : '21-100-18');
               return '<div class="it">' +
                 '<div class="t">' +
-                  '<b>' + esc(w ? w.name : 'Personel') + '</b>' +
+                  '<b>' + esc(w ? w.name : 'Personel') + (isKetua ? ' <span class="pill ok" style="font-size:9.5px;padding:1px 6px">Ketua · SPT Tahunan</span>' : '') + '</b>' +
                   '<span>NIK: ' + esc(w ? w.nik : '—') + ' · KOP: ' + kop + ' · Bruto ' + rpC(pay.gross) + '</span>' +
                 '</div>' +
                 '<div class="r">' +
@@ -4992,6 +5021,491 @@ function exportCoretaxCSV() {
   a.click();
   toast('File CSV Coretax siap diimpor ke e-Bupot');
 }
+
+/* ==========================================================================
+   REKAPITULASI PENGHASILAN & PAJAK KETUA PENELITI (UNTUK SPT TAHUNAN)
+   Khusus Ketua Peneliti karena regulasi Coretax DJP: Pemotong tidak dapat
+   menerbitkan BP21 atas namanya sendiri (CounterpartTin != Pemotong).
+   Build n Code by zandev.id
+   ========================================================================== */
+function getKetuaData(scope = 'current') {
+  const p = P();
+  const allWorkers = S.workers || [];
+  const allPays = S.payrolls || [];
+
+  const KETUA_NIK = '3578047105750010';
+  const KETUA_NPWP = '07.123.456.7-604.000';
+  const DEFAULT_LEADER = p.leader || 'Dr. Siti Rahayu Nadhiroh, S.KM., M.Kes.';
+
+  // 1. Cari profil worker Ketua
+  let ketuaWorker = allWorkers.find(w => 
+    w.pid === p.id && (
+      (w.role && w.role.toLowerCase().includes('ketua')) ||
+      (w.name && w.name.toLowerCase().includes('nadhiroh')) ||
+      (w.nik && w.nik.replace(/\D/g, '') === KETUA_NIK)
+    )
+  );
+
+  if (!ketuaWorker) {
+    ketuaWorker = allWorkers.find(w => 
+      (w.role && w.role.toLowerCase().includes('ketua')) ||
+      (w.name && w.name.toLowerCase().includes('nadhiroh')) ||
+      (w.nik && w.nik.replace(/\D/g, '') === KETUA_NIK)
+    );
+  }
+
+  const name = ketuaWorker ? ketuaWorker.name : DEFAULT_LEADER;
+  const nik = (ketuaWorker && ketuaWorker.nik) ? ketuaWorker.nik : KETUA_NIK;
+  const npwp = (ketuaWorker && ketuaWorker.npwp) ? ketuaWorker.npwp : KETUA_NPWP;
+  const role = ketuaWorker ? ketuaWorker.role : 'Ketua Tim Peneliti (PI)';
+
+  // 2. Filter transaksi kuitansi honorarium Ketua
+  const isAll = (scope === 'all');
+  const pays = allPays.filter(pay => {
+    if (!isAll && pay.pid !== p.id) return false;
+
+    if (ketuaWorker && pay.wid === ketuaWorker.id) return true;
+
+    const w = allWorkers.find(x => x.id === pay.wid);
+    if (w) {
+      if (w.role && w.role.toLowerCase().includes('ketua')) return true;
+      if (w.name && w.name.toLowerCase().includes('nadhiroh')) return true;
+      if (w.nik && w.nik.replace(/\D/g, '') === KETUA_NIK) return true;
+    }
+
+    const txt = ((pay.note || '') + ' ' + (pay.period || '')).toLowerCase();
+    if (txt.includes('ketua') || txt.includes('nadhiroh')) return true;
+
+    return false;
+  }).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.ts || 0) - (b.ts || 0));
+
+  const totalGross = pays.reduce((s, x) => s + (x.gross || 0), 0);
+  const totalTax = pays.reduce((s, x) => s + (x.tax_amt || 0), 0);
+  const totalNetto = pays.reduce((s, x) => s + (x.netto || 0), 0);
+  const dpp = Math.round(totalGross * 0.5); // 50% Norma / Deemed Penghitungan Neto Bukan Pegawai
+
+  return {
+    project: p,
+    scope: scope || 'current',
+    worker: ketuaWorker,
+    name,
+    nik,
+    npwp,
+    role,
+    pays,
+    totalGross,
+    totalTax,
+    totalNetto,
+    dpp
+  };
+}
+
+window.sheetRekapSptKetua = function(scope = 'current') {
+  const p = P();
+  const allProjects = S.projects || [];
+  const kd = getKetuaData(scope);
+
+  const isAll = (scope === 'all');
+  const projTitle = isAll ? ('Gabungan Seluruh Proyek Hibah (' + allProjects.length + ' Proyek)') : (p.name || 'Proyek Ini');
+
+  let projectSelectHtml = '';
+  if (allProjects.length > 1) {
+    projectSelectHtml = '<div style="margin-bottom:12px">' +
+      '<label class="tiny muted" style="display:block;margin-bottom:4px;font-weight:600">Pilih Cakupan Proyek:</label>' +
+      '<select id="spt-ketua-scope" style="font-size:12.5px" onchange="sheetRekapSptKetua(this.value)">' +
+        '<option value="current" ' + (!isAll ? 'selected' : '') + '>📁 Proyek Saat Ini: ' + esc(p.name || p.id) + '</option>' +
+        '<option value="all" ' + (isAll ? 'selected' : '') + '>🌐 Akumulasi Semua Proyek Riset (' + allProjects.length + ' Proyek)</option>' +
+      '</select>' +
+    '</div>';
+  }
+
+  let tableHtml = '';
+  if (!kd.pays.length) {
+    tableHtml = '<div style="text-align:center;padding:24px 12px;background:var(--panel2);border-radius:12px;border:1px dashed var(--line);margin-bottom:12px">' +
+      '<div style="font-size:32px;margin-bottom:8px">📝</div>' +
+      '<b style="font-size:13.5px">Belum Ada Kuitansi Honor Ketua Tercatat</b>' +
+      '<p class="small muted" style="margin:6px 0 0;line-height:1.45">' +
+        'Belum ada slip pembayaran honorarium atas nama Dr. Siti Rahayu Nadhiroh di ' + (isAll ? 'seluruh proyek' : 'proyek ini') + '. Tambahkan honor melalui menu <b>Honorarium &rarr; + Bayar Honorarium Baru</b> dengan memilih nama Ketua Peneliti.' +
+      '</p>' +
+    '</div>';
+  } else {
+    tableHtml = '<div style="overflow-x:auto;margin-bottom:14px;border:1px solid var(--line);border-radius:12px">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left">' +
+        '<thead style="background:var(--panel2);border-bottom:1px solid var(--line)">' +
+          '<tr>' +
+            '<th style="padding:8px 10px">No</th>' +
+            '<th style="padding:8px 10px">Kuitansi / Ref</th>' +
+            '<th style="padding:8px 10px">Tanggal</th>' +
+            '<th style="padding:8px 10px">Uraian / Termin</th>' +
+            '<th style="padding:8px 10px;text-align:right">Bruto (Rp)</th>' +
+            '<th style="padding:8px 10px;text-align:right">PPh 21 (5%)</th>' +
+            '<th style="padding:8px 10px;text-align:right">Netto (Rp)</th>' +
+            '<th style="padding:8px 10px;text-align:center">Slip</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>' +
+          kd.pays.map((pay, i) => {
+            return '<tr style="border-bottom:1px solid var(--line)">' +
+              '<td style="padding:8px 10px">' + (i + 1) + '</td>' +
+              '<td style="padding:8px 10px"><b style="color:var(--info)">' + esc(pay.ref || pay.id) + '</b></td>' +
+              '<td style="padding:8px 10px;white-space:nowrap">' + fdl(pay.date) + '</td>' +
+              '<td style="padding:8px 10px">' + esc(pay.note || pay.period || 'Honor Ketua') + '</td>' +
+              '<td style="padding:8px 10px;text-align:right;font-weight:600">' + rpC(pay.gross) + '</td>' +
+              '<td style="padding:8px 10px;text-align:right;color:var(--warning);font-weight:600">' + rpC(pay.tax_amt) + '</td>' +
+              '<td style="padding:8px 10px;text-align:right;color:var(--ok);font-weight:700">' + rpC(pay.netto) + '</td>' +
+              '<td style="padding:8px 10px;text-align:center">' +
+                '<button type="button" class="btn xs outline" style="font-size:10px;padding:2px 6px" onclick="downloadOfficialSlip(\'' + pay.id + '\')">📄 Slip</button>' +
+              '</td>' +
+            '</tr>';
+          }).join('') +
+          '<tr style="background:var(--panel2);font-weight:800;border-top:2px solid var(--line)">' +
+            '<td colspan="4" style="padding:10px;text-align:right">TOTAL:</td>' +
+            '<td style="padding:10px;text-align:right">' + rpC(kd.totalGross) + '</td>' +
+            '<td style="padding:10px;text-align:right;color:var(--warning)">' + rpC(kd.totalTax) + '</td>' +
+            '<td style="padding:10px;text-align:right;color:var(--ok)">' + rpC(kd.totalNetto) + '</td>' +
+            '<td></td>' +
+          '</tr>' +
+        '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
+  const body = '<div class="stack" style="gap:12px">' +
+    projectSelectHtml +
+    '<div class="card" style="background:linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04));border-left:4px solid var(--ok);padding:12px 14px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+        '<b style="font-size:13.5px;color:var(--ok)">👩‍💼 Identitas Wajib Pajak (Ketua Peneliti)</b>' +
+        '<span class="pill ok" style="font-size:10px">Terverifikasi</span>' +
+      '</div>' +
+      '<div style="font-size:12.5px;line-height:1.6">' +
+        '<div>Nama: <b>' + esc(kd.name) + '</b></div>' +
+        '<div>NIK: <code>' + esc(kd.nik) + '</code> &bull; NPWP: <code>' + esc(kd.npwp) + '</code></div>' +
+        '<div>NITKU Pemotong Coretax: <code>' + esc(kd.nik) + '000000</code></div>' +
+        '<div>Proyek: <b>' + esc(projTitle) + '</b></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="background:var(--hero);color:var(--hero-ink);padding:14px">' +
+      '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--hero-muted);margin-bottom:4px">Data Acuan Pelaporan SPT Tahunan PPh Orang Pribadi (1770 / 1770 S)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">' +
+        '<div style="background:rgba(255,255,255,0.08);padding:10px;border-radius:10px">' +
+          '<div style="font-size:11px;color:var(--hero-muted)">1. Penghasilan Bruto (Total)</div>' +
+          '<div style="font-size:18px;font-weight:800;color:var(--helm)">' + rpC(kd.totalGross) + '</div>' +
+          '<div style="font-size:10px;opacity:0.8">Akumulasi seluruh termin riset</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:10px;border-radius:10px">' +
+          '<div style="font-size:11px;color:var(--hero-muted)">2. Norma / DPP (50%)</div>' +
+          '<div style="font-size:18px;font-weight:800;color:#67e8f9">' + rpC(kd.dpp) + '</div>' +
+          '<div style="font-size:10px;opacity:0.8">Perhitungan neto bukan pegawai</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:10px;border-radius:10px">' +
+          '<div style="font-size:11px;color:var(--hero-muted)">3. Kredit Pajak PPh 21</div>' +
+          '<div style="font-size:18px;font-weight:800;color:#fcd34d">' + rpC(kd.totalTax) + '</div>' +
+          '<div style="font-size:10px;opacity:0.8">Dipotong &amp; disetor hibah riset</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:10px;border-radius:10px">' +
+          '<div style="font-size:11px;color:var(--hero-muted)">4. Jumlah Netto Diterima</div>' +
+          '<div style="font-size:18px;font-weight:800;color:#86efac">' + rpC(kd.totalNetto) + '</div>' +
+          '<div style="font-size:10px;opacity:0.8">Diterima di rekening bank</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<b style="font-size:13px">Daftar Kuitansi Honorarium Ketua (' + kd.pays.length + ' Transaksi)</b>' +
+        (kd.pays.length ? '<button type="button" class="btn xs outline" onclick="exportRekapKetuaCSV(\'' + scope + '\')">📥 Unduh CSV</button>' : '') +
+      '</div>' +
+      tableHtml +
+    '</div>' +
+
+    '<div class="card" style="background:rgba(2,132,199,0.06);border-left:4px solid var(--info);padding:12px 14px">' +
+      '<b style="font-size:12.5px;color:var(--info)">💡 Panduan Cepat Lapor di Portal Coretax DJP</b>' +
+      '<ol style="margin:6px 0 0 16px;padding:0;font-size:11.5px;line-height:1.5;color:var(--ink)">' +
+        '<li>Login ke <b>coretax.pajak.go.id</b> menggunakan NIK / NPWP Ketua Peneliti (<code>' + esc(kd.nik) + '</code>).</li>' +
+        '<li>Pilih menu <b>SPT Tahunan &rarr; PPh Orang Pribadi (Form 1770 / 1770 S)</b> untuk Tahun Pajak <b>' + (p.year || 2026) + '</b>.</li>' +
+        '<li>Pada Bagian <b>Penghasilan Neto Lainnya (Pekerjaan Bebas / Jasa Riset)</b>, masukkan Bruto <b>' + rp(kd.totalGross) + '</b> dan Norma 50% <b>' + rp(kd.dpp) + '</b>.</li>' +
+        '<li>Pada Bagian <b>Daftar Pemotongan/Pungutan PPh (Kredit Pajak)</b>, masukkan PPh 21 sebesar <b>' + rp(kd.totalTax) + '</b> yang telah dipotong dari kas proyek riset sebagai pengurang pajak tahunan.</li>' +
+        '<li>Cetak / Simpan dokumen PDF rekapitulasi di bawah ini sebagai lampiran pendukung resmi jika diperlukan pemeriksa pajak.</li>' +
+      '</ol>' +
+    '</div>' +
+
+    '<div class="row" style="gap:8px;margin-top:4px">' +
+      '<button class="btn ok block" style="flex:1.2;background:linear-gradient(135deg,#059669,#047857);color:#fff;border-color:transparent;font-weight:750" onclick="printRekapSptKetua(\'' + scope + '\')">🖨️ Cetak / Simpan PDF Resmi (A4)</button>' +
+      '<button class="btn block" style="flex:0.8" onclick="exportRekapKetuaCSV(\'' + scope + '\')">📥 Unduh CSV</button>' +
+    '</div>' +
+  '</div>';
+
+  sheet('Rekap Pajak Ketua Peneliti (SPT Tahunan)', body, 'Tutup', () => closeSheet(), 'outline');
+};
+
+window.printRekapSptKetua = function(scope = 'current') {
+  const kd = getKetuaData(scope);
+  const p = kd.project;
+  const isAll = (scope === 'all');
+  const projTitle = isAll ? 'Gabungan Seluruh Proyek Hibah Riset' : (p.name || 'Proyek Riset');
+
+  const rowsHtml = (!kd.pays.length)
+    ? '<tr><td colspan="9" style="text-align:center;padding:16px;color:#64748b;">Belum ada riwayat kuitansi honorarium tercatat atas nama Ketua Peneliti.</td></tr>'
+    : kd.pays.map((pay, i) => {
+        const dpp = Math.round((pay.gross || 0) * 0.5);
+        return '<tr>' +
+          '<td style="text-align:center;">' + (i + 1) + '</td>' +
+          '<td><b>' + esc(pay.ref || pay.id) + '</b></td>' +
+          '<td style="white-space:nowrap;">' + fdl(pay.date) + '</td>' +
+          '<td>' + esc(pay.note || pay.period || 'Honorarium Ketua') + '</td>' +
+          '<td style="text-align:right;">' + rpC(pay.gross) + '</td>' +
+          '<td style="text-align:right;">' + rpC(dpp) + '</td>' +
+          '<td style="text-align:center;">' + ((pay.tax_rate || 0.05) * 100).toFixed(1) + '%</td>' +
+          '<td style="text-align:right;color:#b91c1c;">' + rpC(pay.tax_amt) + '</td>' +
+          '<td style="text-align:right;font-weight:bold;color:#15803d;">' + rpC(pay.netto) + '</td>' +
+        '</tr>';
+      }).join('');
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Rekap Penghasilan & Pajak Ketua Peneliti (SPT Tahunan) — ${esc(kd.name)}</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a; line-height: 1.45; background: #fff; font-size: 12px; }
+  .kop { text-align: center; border-bottom: 2.5px double #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
+  .kop .inst { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+  .kop .sub { font-size: 11.5px; color: #334155; margin-top: 2px; }
+  .kop .fak { font-size: 11px; color: #475569; }
+  .title-box { text-align: center; margin-bottom: 16px; }
+  .doc-title { font-size: 14.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; color: #0f172a; }
+  .doc-sub { font-size: 11px; font-weight: 600; color: #0369a1; margin-top: 2px; }
+  .id-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11.5px; }
+  .id-table td { padding: 4px 6px; vertical-align: top; }
+  .id-table .lbl { width: 170px; color: #475569; font-weight: 600; }
+  .table-data { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font-size: 11px; }
+  .table-data th, .table-data td { border: 1px solid #cbd5e1; padding: 6px 8px; }
+  .table-data th { background: #f1f5f9; font-weight: 700; text-align: center; }
+  .summary-box { border: 1.5px solid #0284c7; background: #f0f9ff; border-radius: 6px; padding: 12px; margin-bottom: 16px; font-size: 11.5px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 8px; text-align: center; }
+  .summary-card { background: #fff; border: 1px solid #bae6fd; border-radius: 6px; padding: 6px 4px; }
+  .summary-card .s-lbl { font-size: 9.5px; color: #64748b; font-weight: 600; }
+  .summary-card .s-val { font-size: 12.5px; font-weight: 800; color: #0f172a; margin-top: 2px; }
+  .notes { font-size: 10px; color: #475569; line-height: 1.45; border-left: 3px solid #0284c7; padding-left: 8px; margin-bottom: 18px; }
+  .ttd-box { display: flex; justify-content: space-between; margin-top: 20px; text-align: center; font-size: 11.5px; page-break-inside: avoid; }
+  .ttd-col { width: 42%; }
+  .ttd-space { height: 65px; display: flex; align-items: center; justify-content: center; color: #059669; font-weight: bold; font-size: 11px; }
+  .footer-credit { margin-top: 26px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 6px; }
+  .footer-credit a { color: #0284c7; text-decoration: none; font-weight: bold; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="kop">
+    <div class="inst">KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI</div>
+    <div class="sub">${esc(p.institution || 'Fakultas Kesehatan Masyarakat, Universitas Airlangga')}</div>
+    <div class="fak">Lembaga Penelitian dan Pengabdian kepada Masyarakat (LPPM) · Tahun Anggaran ${p.year || 2026}</div>
+  </div>
+
+  <div class="title-box">
+    <div class="doc-title">REKAPITULASI PENGHASILAN &amp; PEMOTONGAN PPH PASAL 21 KETUA PENELITI</div>
+    <div class="doc-sub">LAMPIRAN PENDUKUNG PELAPORAN SPT TAHUNAN PPh ORANG PRIBADI (FORM 1770 / 1770 S)</div>
+  </div>
+
+  <table class="id-table">
+    <tr>
+      <td class="lbl">Nama Wajib Pajak (Ketua)</td>
+      <td style="width:10px">:</td>
+      <td><b>${esc(kd.name)}</b></td>
+      <td class="lbl">Tahun Pajak</td>
+      <td style="width:10px">:</td>
+      <td><b>${p.year || 2026}</b></td>
+    </tr>
+    <tr>
+      <td class="lbl">NIK (KTP / Coretax)</td>
+      <td>:</td>
+      <td><b>${esc(kd.nik)}</b></td>
+      <td class="lbl">Status Wajib Pajak</td>
+      <td>:</td>
+      <td>Orang Pribadi (Bukan Pegawai)</td>
+    </tr>
+    <tr>
+      <td class="lbl">NPWP (15 Digit)</td>
+      <td>:</td>
+      <td>${esc(kd.npwp || '—')}</td>
+      <td class="lbl">NITKU Akun Coretax</td>
+      <td>:</td>
+      <td><code>${esc(kd.nik)}000000</code></td>
+    </tr>
+    <tr>
+      <td class="lbl">Judul Riset / Hibah</td>
+      <td>:</td>
+      <td colspan="4"><b>${esc(projTitle)}</b></td>
+    </tr>
+    <tr>
+      <td class="lbl">Skema Pendanaan</td>
+      <td>:</td>
+      <td colspan="4">${esc(p.scheme || 'Hibah Riset Mandiri / Kolaborasi PT')}</td>
+    </tr>
+  </table>
+
+  <table class="table-data">
+    <thead>
+      <tr>
+        <th style="width:28px">No</th>
+        <th>Nomor Kuitansi</th>
+        <th>Tanggal</th>
+        <th>Uraian Kegiatan / Termin</th>
+        <th>Penghasilan Bruto</th>
+        <th>Dasar Norma (50%)</th>
+        <th>Tarif</th>
+        <th>PPh 21 Dipotong</th>
+        <th>Netto Diterima</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+      <tr style="background:#f8fafc;font-weight:bold;border-top:2px solid #0f172a">
+        <td colspan="4" style="text-align:right">JUMLAH TOTAL:</td>
+        <td style="text-align:right">${rpC(kd.totalGross)}</td>
+        <td style="text-align:right">${rpC(kd.dpp)}</td>
+        <td style="text-align:center;">5.0%</td>
+        <td style="text-align:right;color:#b91c1c;">${rpC(kd.totalTax)}</td>
+        <td style="text-align:right;color:#15803d;">${rpC(kd.totalNetto)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="summary-box">
+    <b style="color:#0369a1;">🏛️ RINGKASAN DATA UNTUK PENGISIAN SPT TAHUNAN DI PORTAL CORETAX DJP:</b>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="s-lbl">PENGHASILAN BRUTO</div>
+        <div class="s-val">${rpC(kd.totalGross)}</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-lbl">DPP / NORMA 50%</div>
+        <div class="s-val" style="color:#0284c7;">${rpC(kd.dpp)}</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-lbl">KREDIT PPH 21</div>
+        <div class="s-val" style="color:#dc2626;">${rpC(kd.totalTax)}</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-lbl">NETTO DITERIMA</div>
+        <div class="s-val" style="color:#16a34a;">${rpC(kd.totalNetto)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <b>Catatan Regulasi Perpajakan (Coretax DJP):</b><br>
+    1. Berdasarkan regulasi Coretax DJP, Wajib Pajak Orang Pribadi yang bertindak selaku Pemotong Pajak dilarang menerbitkan Bukti Potong elektronik (BP21) atas dirinya sendiri.<br>
+    2. Dokumen Rekapitulasi Resmi ini beserta salinan kuitansi pencairan honorarium berfungsi sebagai bukti pendukung yang sah bagi Ketua Peneliti untuk melaporkan penghasilan dan mengkreditkan PPh Pasal 21 yang telah dipotong/disetor dalam formulir SPT Tahunan PPh Orang Pribadi (Form 1770 / 1770 S).
+  </div>
+
+  <div class="ttd-box">
+    <div class="ttd-col">
+      <div>Mengetahui / Diverifikasi,</div>
+      <div><b>Bendahara Pengeluaran Riset</b></div>
+      <div class="ttd-space">[ Tanda Tangan &amp; Stempel ]</div>
+      <div><b><u>Siti Rahmawati, S.E.</u></b></div>
+      <div style="font-size:10.5px;color:#64748b;">NIP. 198504122010122003</div>
+    </div>
+    <div class="ttd-col">
+      <div>Surabaya, ${fdl(today())}</div>
+      <div>Ketua Tim Peneliti,</div>
+      <div class="ttd-space" style="color:#0284c7;">[ Sah &amp; Bermeterai ]</div>
+      <div><b><u>${esc(kd.name)}</u></b></div>
+      <div style="font-size:10.5px;color:#64748b;">NIK: ${esc(kd.nik)}</div>
+    </div>
+  </div>
+
+  <div class="footer-credit">
+    Dokumen resmi ini dicetak secara otomatis dari Sistem Manajemen Keuangan &amp; Pajak Riset ZanFin · <a href="https://zandev.id" target="_blank" rel="noopener">Build n Code by <b>zandev.id</b></a>
+  </div>
+
+  <div class="no-print" style="margin-top:20px;text-align:center;">
+    <button onclick="window.print()" style="padding:10px 24px;background:#0284c7;color:#fff;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">🖨️ Cetak / Simpan PDF Sekarang</button>
+  </div>
+
+` + '<' + 'script>' + `
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 250);
+    };
+` + '<' + '/script>' + `
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = url;
+    const projTag = (kd.project.name || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+    a.download = `Rekap_SPT_Ketua_${projTag}_${today()}.html`;
+    a.click();
+    toast('Dokumen Rekap Pajak Ketua berhasil diunduh ✓');
+  }
+};
+
+window.exportRekapKetuaCSV = function(scope = 'current') {
+  const kd = getKetuaData(scope);
+  if (!kd.pays.length) {
+    toast('Tidak ada data honorarium Ketua Peneliti untuk diekspor');
+    return;
+  }
+
+  let csv = 'No,Nomor Kuitansi,Tanggal,Keterangan Kegiatan,Penghasilan Bruto (Rp),Dasar Pengenaan Pajak (DPP 50%),Tarif Pajak,PPh Pasal 21 (Rp),Jumlah Netto Diterima (Rp),Nama Penerima,NIK (16 Digit),NPWP,Judul Proyek,Kategori SPT\n';
+
+  kd.pays.forEach((pay, idx) => {
+    const dpp = Math.round((pay.gross || 0) * 0.5);
+    csv += [
+      idx + 1,
+      '"' + (pay.ref || pay.id) + '"',
+      pay.date,
+      '"' + (pay.note || pay.period || 'Honorarium Ketua Peneliti').replace(/"/g, '""') + '"',
+      pay.gross,
+      dpp,
+      ((pay.tax_rate || 0.05) * 100).toFixed(1) + '%',
+      pay.tax_amt,
+      pay.netto,
+      '"' + kd.name + '"',
+      "'" + kd.nik,
+      "'" + kd.npwp,
+      '"' + (kd.project.name || '').replace(/"/g, '""') + '"',
+      '"SPT Tahunan PPh OP (Bukan Pegawai)"'
+    ].join(',') + '\n';
+  });
+
+  csv += [
+    'TOTAL',
+    '""',
+    '""',
+    '"Total Akumulasi Honorarium Ketua"',
+    kd.totalGross,
+    kd.dpp,
+    '""',
+    kd.totalTax,
+    kd.totalNetto,
+    '""',
+    '""',
+    '""',
+    '""',
+    '""'
+  ].join(',') + '\n';
+
+  const projTag = (kd.project.name || 'Proyek').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25);
+  const fileName = 'Rekap_SPT_Tahunan_Ketua_' + projTag + '_' + today() + '.csv';
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  a.click();
+  toast('File CSV Rekap SPT Ketua (' + kd.pays.length + ' kuitansi) berhasil diunduh ✓');
+};
 
 
 /* ==========================================================================
