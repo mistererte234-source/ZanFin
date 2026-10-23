@@ -2128,6 +2128,10 @@ function sanitizeAllData() {
   // 1. Projects Sanitization
   if (S.projects) {
     for (const p of S.projects) {
+      if (!p.honor_source) {
+        p.honor_source = 'direct';
+        migrated = true;
+      }
       if (p.leader && (FAKE_TITLE_SNIPPETS.some(f => p.leader.includes(f)) || !p.leader.includes('Siti Rahayu'))) {
         p.leader = REAL_LEADER;
         migrated = true;
@@ -2855,9 +2859,16 @@ function kasSaldo(pid) {
   const p = P();
   const tx = txnsOf(pid);
   const masuk = tx.filter(t => t.dir === 'in').reduce((s, t) => s + t.amount, 0);
+  const isDirect = (p.honor_source !== 'bendahara');
+
+  if (isDirect) {
+    // Mekanisme Direct Transfer Unair: Honor ditransfer langsung oleh universitas, tidak memotong kas bendahara
+    const keluarNonHonor = tx.filter(t => t.dir === 'out' && t.cat !== 'honor').reduce((s, t) => s + t.amount, 0);
+    return (p.saldo || 0) + masuk - keluarNonHonor;
+  }
+
   const keluar = tx.filter(t => t.dir === 'out').reduce((s, t) => s + t.amount, 0);
   const honorKeluar = payrollsOf(pid).reduce((s, p) => s + p.netto, 0);
-  // Txns might already record honor, so check if honor is already in txns:
   const txHonor = tx.filter(t => t.dir === 'out' && t.cat === 'honor').reduce((s, t) => s + t.amount, 0);
   return (p.saldo || 0) + masuk - keluar - (honorKeluar > txHonor ? (honorKeluar - txHonor) : 0);
 }
@@ -3012,6 +3023,11 @@ function vNadi() {
   const pct = p.pagu ? Math.min(100, Math.round((real / p.pagu) * 100)) : 0;
   const pjk = totalPajak(p.id);
   const ws = workersOf(p.id);
+  const isDirect = (p.honor_source !== 'bendahara');
+
+  const belanjaNonHonor = tx.filter(t => t.dir === 'out' && t.cat !== 'honor').reduce((s, t) => s + t.amount, 0);
+  const honorNetto = payrollsOf(p.id).reduce((s, x) => s + x.netto, 0);
+  const paysCount = payrollsOf(p.id).length;
 
   const curRole = ROLES[CURRENT_ROLE] || ROLES.bendahara;
   const userObj = ME || { name: curRole.person || curRole.name, username: CURRENT_ROLE, role: CURRENT_ROLE };
@@ -3049,37 +3065,68 @@ function vNadi() {
       '</div>' : '') +
 
     '<section class="hero" aria-label="Kas Hibah">' +
-      '<div class="lab">Kas di Rekening Penelitian</div>' +
+      '<div class="row between" style="align-items:center;margin-bottom:2px">' +
+        '<div class="lab">' + (isDirect ? 'Kas di Rekening Bendahara (Operasional)' : 'Kas di Rekening Penelitian') + '</div>' +
+        '<button class="pill ' + (isDirect ? 'info' : 'ok') + '" style="font-size:10px;cursor:pointer;padding:2px 8px;border:none;font-weight:700" onclick="sheetMekanismeHonor()">' +
+          (isDirect ? '🏛️ Direct Unair' : '💳 Kas Bendahara') + ' ▾' +
+        '</button>' +
+      '</div>' +
       '<div class="big">' + bigRp(k) + '</div>' +
       '<div class="words">' + (k ? '≈ ' + rpWords(k) : 'Belum ada saldo') + '</div>' +
       '<div class="flow">' +
-        '<div>Total Hibah<b>' + rpC(p.pagu) + '</b></div>' +
+        '<div>Total Pagu<b>' + rpC(p.pagu) + '</b></div>' +
         '<div>Termin Masuk<b>' + rpC(masuk) + '</b></div>' +
-        '<div>Realisasi<b>' + rpC(real) + '</b></div>' +
+        '<div>' + (isDirect ? 'Belanja Kas' : 'Realisasi') + '<b>' + rpC(isDirect ? belanjaNonHonor : real) + '</b></div>' +
       '</div>' +
     '</section>' +
+
+    /* Kartu Distribusi Realisasi (Non-Honor vs Honor) */
+    '<div class="card" style="background:linear-gradient(135deg, rgba(2,132,199,0.06), rgba(16,185,129,0.04));border:1.5px solid rgba(2,132,199,0.22);padding:14px;border-radius:14px">' +
+      '<div class="row between" style="align-items:center;margin-bottom:10px">' +
+        '<div style="font-weight:750;font-size:13px;display:flex;align-items:center;gap:6px">' +
+          '<span>⚖️</span> <span>Distribusi Realisasi: Non-Honor vs Honor</span>' +
+        '</div>' +
+        '<span class="tiny muted">Realisasi Akumulatif</span>' +
+      '</div>' +
+      '<div class="grid2" style="gap:10px">' +
+        '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">' +
+          '<div class="tiny muted" style="margin-bottom:2px">🛍️ Belanja Operasional (Non-Honor)</div>' +
+          '<div style="font-size:16px;font-weight:800;color:var(--ink)">' + rpC(belanjaNonHonor) + '</div>' +
+          '<div class="tiny muted" style="margin-top:2px">Keluar dari rekening bendahara</div>' +
+        '</div>' +
+        '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">' +
+          '<div class="tiny muted" style="margin-bottom:2px">🏛️ Honorarium Tim (' + (isDirect ? 'Direct Unair' : 'Kas') + ')</div>' +
+          '<div style="font-size:16px;font-weight:800;color:var(--info)">' + rpC(honorNetto) + '</div>' +
+          '<div class="tiny muted" style="margin-top:2px">' + paysCount + ' slip ' + (isDirect ? '• Ditransfer Ditkeu Unair' : '• Dibayar bendahara') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12px">' +
+        '<span class="muted">Total Realisasi Serapan Pagu Riset:</span>' +
+        '<b>' + rpC(real) + ' <span class="muted">(' + pct + '% dari pagu ' + rpC(p.pagu) + ')</span></b>' +
+      '</div>' +
+    '</div>' +
 
     '<div class="grid2">' +
       '<button class="card" onclick="go(\'kas\')">' +
         '<div class="lab">Serapan Anggaran</div>' +
         '<div class="val">' + pct + '%</div>' +
         '<div class="ruler"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="sub">Terpakai ' + rpC(real) + ' dari pagu ' + rpC(p.pagu) + '</div>' +
+        '<div class="sub">Terpakai ' + rpC(real) + ' (Operasional + Honor)</div>' +
       '</button>' +
       '<button class="card" onclick="go(\'tim\')">' +
         '<div class="lab">Tim Penelitian</div>' +
         '<div class="val">' + ws.length + ' <span class="muted" style="font-size:16px">orang</span></div>' +
-        '<div class="sub">Ketua, Anggota, Asisten &amp; Enumerator Lapangan</div>' +
+        '<div class="sub">Ketua, Anggota, Asisten &amp; Enumerator</div>' +
       '</button>' +
       '<button class="card" onclick="go(\'honor\')">' +
         '<div class="lab">Honor Dibayarkan</div>' +
-        '<div class="val">' + rpC(payrollsOf(p.id).reduce((s, x) => s + x.netto, 0)) + '</div>' +
-        '<div class="sub">' + payrollsOf(p.id).length + ' slip kuitansi tervalidasi</div>' +
+        '<div class="val">' + rpC(honorNetto) + '</div>' +
+        '<div class="sub">' + paysCount + ' slip ' + (isDirect ? '• Ditransfer Unair' : 'tervalidasi') + '</div>' +
       '</button>' +
       '<button class="card" onclick="go(null, \'pajak\')">' +
-        '<div class="lab">PPh 21 e-Bupot DJP</div>' +
+        '<div class="lab">PPh 21 Pajak</div>' +
         '<div class="val" style="color:#10b981">' + rpC(pjk.pph21) + '</div>' +
-        '<div class="sub"><span class="pill ok" style="font-size:10px;padding:1px 5px;font-weight:700">✓ LUNAS BPE</span> · Beban Riset ' + rpC(pjk.total) + '</div>' +
+        '<div class="sub">' + (isDirect ? '<span class="pill info" style="font-size:9.5px;padding:1px 5px">🏛️ Dipotong Unair</span>' : '<span class="pill ok" style="font-size:10px;padding:1px 5px;font-weight:700">✓ LUNAS BPE</span>') + ' · Beban Riset ' + rpC(pjk.total) + '</div>' +
       '</button>' +
     '</div>' +
 
@@ -3501,11 +3548,14 @@ function vKas() {
   const p = P();
   const k = kasSaldo(p.id);
   const tx = txnsOf(p.id);
+  const isDirect = (p.honor_source !== 'bendahara');
 
   const chips = [
     ['semua', 'Semua'],
     ['in', 'Dana Masuk'],
-    ['out', 'Dana Keluar'],
+    ['out', 'Semua Keluar'],
+    ['non_honor', '🛍️ Non-Honor / Belanja'],
+    ['honor', '💵 Honorarium'],
     ['bahan', 'Bahan Lab/ATK'],
     ['perjalanan', 'Perjalanan'],
     ['publikasi', 'Publikasi'],
@@ -3515,6 +3565,8 @@ function vKas() {
   let list = tx.slice();
   if (kasFilter === 'in') list = list.filter(t => t.dir === 'in');
   else if (kasFilter === 'out') list = list.filter(t => t.dir === 'out');
+  else if (kasFilter === 'honor') list = list.filter(t => t.cat === 'honor');
+  else if (kasFilter === 'non_honor') list = list.filter(t => t.dir === 'out' && t.cat !== 'honor');
   else if (kasFilter !== 'semua') list = list.filter(t => t.cat === kasFilter);
 
   list.sort((a, b) => b.date.localeCompare(a.date) || (b.ts || 0) - (a.ts || 0));
@@ -3524,10 +3576,41 @@ function vKas() {
     (byDate[t.date] = byDate[t.date] || []).push(t);
   });
 
+  const masuk = tx.filter(t => t.dir === 'in').reduce((s, t) => s + t.amount, 0);
+  const belanjaNonHonor = tx.filter(t => t.dir === 'out' && t.cat !== 'honor').reduce((s, t) => s + t.amount, 0);
+  const honorTotal = tx.filter(t => t.dir === 'out' && t.cat === 'honor').reduce((s, t) => s + t.amount, 0);
+
   return '<div class="stack">' +
-    '<div class="row between">' +
-      '<h2>Buku Kas Umum</h2>' +
-      '<span class="pill ok num">' + rpC(k) + '</span>' +
+    '<div class="row between" style="align-items:flex-start">' +
+      '<div>' +
+        '<h2>Buku Kas Umum</h2>' +
+        '<div class="tiny muted" style="margin-top:2px">' +
+          (isDirect ? 'Mekanisme: <button class="link-btn" onclick="sheetMekanismeHonor()" style="color:var(--info);font-weight:700">Direct Unair ▾</button>' : 'Mekanisme: <button class="link-btn" onclick="sheetMekanismeHonor()" style="color:var(--ok);font-weight:700">Kas Bendahara ▾</button>') +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<div class="pill ' + (k < 0 ? 'bad' : 'ok') + ' num" style="cursor:pointer;font-size:13px;padding:4px 10px" onclick="sheetMekanismeHonor()" title="Klik untuk atur mekanisme honor">' +
+          (isDirect ? 'Kas Bendahara: ' : 'Saldo Kas: ') + rpC(k) +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    /* Ringkasan Kas Cepat */
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">' +
+      '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px">' +
+        '<div class="tiny muted">Termin Masuk</div>' +
+        '<div style="font-weight:800;font-size:12.5px;color:var(--ok);margin-top:2px">' + rpC(masuk) + '</div>' +
+      '</div>' +
+      '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px">' +
+        '<div class="tiny muted">Belanja Kas</div>' +
+        '<div style="font-weight:800;font-size:12.5px;color:var(--ink);margin-top:2px">' + rpC(belanjaNonHonor) + '</div>' +
+        '<div class="tiny muted" style="font-size:9px">Non-Honor</div>' +
+      '</div>' +
+      '<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px">' +
+        '<div class="tiny muted">Total Honor</div>' +
+        '<div style="font-weight:800;font-size:12.5px;color:var(--info);margin-top:2px">' + rpC(honorTotal) + '</div>' +
+        '<div class="tiny muted" style="font-size:9px">' + (isDirect ? 'Direct Unair' : 'Kas Bendahara') + '</div>' +
+      '</div>' +
     '</div>' +
 
     '<div class="row" style="gap:8px">' +
@@ -3548,18 +3631,22 @@ function vKas() {
             '<div class="dayhd">' + fdl(d) + '</div>' +
             arr.map(t =>
               '<button class="it" onclick="sheetTxnDetail(\'' + t.id + '\')">' +
-                '<div class="avatar" style="color:' + (t.dir === 'in' ? 'var(--ok)' : 'var(--bad)') + '">' +
-                  (t.dir === 'in' ? '↓' : '↑') +
+                '<div class="avatar" style="color:' + (t.dir === 'in' ? 'var(--ok)' : (t.cat === 'honor' ? 'var(--info)' : 'var(--bad)')) + '">' +
+                  (t.dir === 'in' ? '↓' : (t.cat === 'honor' ? '💵' : '↑')) +
                 '</div>' +
                 '<div class="t">' +
                   '<b>' + esc(t.note || t.cat) + '</b>' +
                   '<span>' + (t.ref ? esc(t.ref) + ' · ' : '') + (CAT_IN[t.cat] || CAT_OUT[t.cat] || t.cat) + '</span>' +
                 '</div>' +
                 '<div class="r">' +
-                  '<b class="' + (t.dir === 'in' ? 'in-c' : 'out-c') + '">' + (t.dir === 'in' ? '+' : '−') + rpC(t.amount) + '</b>' +
-                  '<span>' +
-                    (t.proof ? '<span class="pill ok" style="padding:1px 6px;font-size:9.5px;font-weight:750">📎 Nota Ada</span>' :
-                      (t.dir === 'out' ? '<span class="pill warning" style="padding:1px 6px;font-size:9.5px">⚠️ Tanpa Nota</span>' : '<span class="pill ok" style="padding:1px 6px;font-size:9.5px">Kas Masuk</span>')
+                  '<b class="' + (t.dir === 'in' ? 'in-c' : (t.cat === 'honor' ? 'info-c' : 'out-c')) + '">' + (t.dir === 'in' ? '+' : '−') + rpC(t.amount) + '</b>' +
+                  '<span style="display:flex;gap:4px;justify-content:flex-end;align-items:center;flex-wrap:wrap">' +
+                    (t.cat === 'honor'
+                      ? '<span class="pill ' + (isDirect ? 'info' : 'ok') + '" style="padding:1px 5px;font-size:9px;font-weight:700">' + (isDirect ? '🏛️ Direct Unair' : '💳 Kas Bendahara') + '</span>'
+                      : (t.dir === 'out' ? '<span class="pill" style="padding:1px 5px;font-size:9px;background:rgba(0,0,0,0.05);color:var(--muted)">🛍️ Belanja Kas</span>' : '')
+                    ) +
+                    (t.proof ? '<span class="pill ok" style="padding:1px 5px;font-size:9px;font-weight:750">📎 Nota Ada</span>' :
+                      (t.dir === 'out' ? '<span class="pill warning" style="padding:1px 5px;font-size:9px">⚠️ Tanpa Nota</span>' : '<span class="pill ok" style="padding:1px 5px;font-size:9px">Kas Masuk</span>')
                     ) +
                   '</span>' +
                 '</div>' +
@@ -3574,6 +3661,56 @@ function vKas() {
 function setKasFilter(f) {
   kasFilter = f;
   render();
+}
+
+function sheetMekanismeHonor() {
+  const p = P();
+  const isDirect = (p.honor_source !== 'bendahara');
+  const tx = txnsOf(p.id);
+  const masuk = tx.filter(t => t.dir === 'in').reduce((s, t) => s + t.amount, 0);
+  const belanjaNonHonor = tx.filter(t => t.dir === 'out' && t.cat !== 'honor').reduce((s, t) => s + t.amount, 0);
+  const honorTotal = tx.filter(t => t.dir === 'out' && t.cat === 'honor').reduce((s, t) => s + t.amount, 0);
+  const saldoDirect = (p.saldo || 0) + masuk - belanjaNonHonor;
+  const saldoBendahara = saldoDirect - honorTotal;
+
+  sheet('Mekanisme Pembayaran Honorarium',
+    '<div class="stack" style="gap:14px">' +
+      '<p class="small muted" style="margin:0;line-height:1.5">' +
+        'Pilih mekanisme pencairan honorarium penelitian. Di PTN-BH (seperti Unair / Ditkeu), honor biasanya ditransfer langsung ke rekening masing-masing personil oleh universitas (Direct Transfer LS).' +
+      '</p>' +
+
+      '<div style="display:flex;flex-direction:column;gap:10px">' +
+        '<label style="display:flex;align-items:flex-start;gap:12px;padding:12px;border:1.5px solid ' + (isDirect ? 'var(--info)' : 'var(--line)') + ';border-radius:12px;background:' + (isDirect ? 'rgba(2,132,199,0.06)' : 'var(--panel2)') + ';cursor:pointer">' +
+          '<input type="radio" name="mech_opt" value="direct"' + (isDirect ? ' checked' : '') + ' style="margin-top:3px">' +
+          '<div>' +
+            '<div style="font-weight:750;font-size:13.5px;color:var(--info)">🏛️ Direct Transfer Unair / PTN-BH (Rekomendasi)</div>' +
+            '<div class="small muted" style="margin-top:2px;line-height:1.4">Honor ditransfer langsung oleh Ditkeu Unair ke rekening personil. Bukti Potong PPh 21 diterbitkan universitas. <b>Kas rekening bendahara TIDAK terpotong</b>.</div>' +
+            '<div class="tiny" style="margin-top:6px;color:var(--ok);font-weight:700">Saldo Kas Bendahara: ' + rpC(saldoDirect) + ' (Surplus Operasional)</div>' +
+          '</div>' +
+        '</label>' +
+
+        '<label style="display:flex;align-items:flex-start;gap:12px;padding:12px;border:1.5px solid ' + (!isDirect ? 'var(--ok)' : 'var(--line)') + ';border-radius:12px;background:' + (!isDirect ? 'rgba(16,185,129,0.06)' : 'var(--panel2)') + ';cursor:pointer">' +
+          '<input type="radio" name="mech_opt" value="bendahara"' + (!isDirect ? ' checked' : '') + ' style="margin-top:3px">' +
+          '<div>' +
+            '<div style="font-weight:750;font-size:13.5px;color:var(--ink)">💳 Kas Rekening Bendahara</div>' +
+            '<div class="small muted" style="margin-top:2px;line-height:1.4">Seluruh honor dibayar mandiri oleh bendahara dari rekening bank hibah. Honorarium memotong saldo kas bendahara.</div>' +
+            '<div class="tiny" style="margin-top:6px;color:' + (saldoBendahara < 0 ? 'var(--bad)' : 'var(--ok)') + ';font-weight:700">Saldo Kas: ' + rpC(saldoBendahara) + '</div>' +
+          '</div>' +
+        '</label>' +
+      '</div>' +
+    '</div>',
+    'Simpan Pengaturan',
+    () => {
+      const selected = document.querySelector('input[name="mech_opt"]:checked');
+      if (selected) {
+        p.honor_source = selected.value;
+        saveState();
+        closeSheet();
+        toast('Mekanisme honor disimpan: ' + (p.honor_source === 'direct' ? 'Direct Transfer Unair' : 'Kas Bendahara'));
+        render();
+      }
+    }
+  );
 }
 
 function sheetKasIn() {
@@ -6476,6 +6613,12 @@ function sheetProyekEdit(pid) {
         fld('Total Pagu Hibah (Rp)', moneyIn('fp-pagu', p.pagu)) +
       '</div>' +
       fld('Rekening Bank Penelitian', '<input id="fp-bank" value="' + esc(p.bank || '') + '">') +
+      fld('Mekanisme Pembayaran Honorarium',
+        '<select id="fp-honor-source">' +
+          '<option value="direct"' + (p.honor_source !== 'bendahara' ? ' selected' : '') + '>🏛️ Direct Transfer Unair / PTN-BH (Tidak Potong Kas Bendahara)</option>' +
+          '<option value="bendahara"' + (p.honor_source === 'bendahara' ? ' selected' : '') + '>💳 Kas Rekening Bendahara (Potong Saldo Kas)</option>' +
+        '</select>'
+      ) +
     '</div>',
     'Simpan Proyek',
     () => {
@@ -6486,6 +6629,7 @@ function sheetProyekEdit(pid) {
       p.year = Number($('#fp-year').value) || 2026;
       p.pagu = parseN($('#fp-pagu').value);
       p.bank = $('#fp-bank').value.trim();
+      p.honor_source = $('#fp-honor-source').value;
       saveState();
       closeSheet();
       toast('Data proyek diperbarui');
@@ -6517,7 +6661,8 @@ function sheetProyekNew() {
         institution: inst,
         year: 2026,
         pagu,
-        saldo: 0
+        saldo: 0,
+        honor_source: 'direct'
       };
       S.projects.push(newP);
       S.activeId = newP.id;
@@ -6558,28 +6703,41 @@ function exportBKU() {
   const p = P();
   const tx = txnsOf(p.id).sort((a, b) => a.date.localeCompare(b.date));
   let saldo = p.saldo || 0;
+  const isDirect = (p.honor_source !== 'bendahara');
 
   const rows = [
     ['BUKU KAS UMUM (BKU) PENELITIAN'],
     ['Judul Penelitian: ' + p.name],
     ['Ketua Peneliti: ' + p.leader],
     ['Tahun Anggaran: ' + p.year],
+    ['Mekanisme Honor: ' + (isDirect ? 'Ditransfer Langsung Ditkeu Universitas (Direct Payroll / LS)' : 'Dibayarkan dari Rekening Kas Bendahara')],
     [],
-    ['No', 'Tanggal', 'No Bukti', 'Kategori', 'Keterangan', 'Penerimaan (Rp)', 'Pengeluaran (Rp)', 'Saldo (Rp)', 'Lampiran Bukti']
+    ['No', 'Tanggal', 'No Bukti', 'Kategori', 'Keterangan', 'Sumber Rekening', 'Penerimaan (Rp)', 'Pengeluaran Kas (Rp)', 'Saldo Kas (Rp)', 'Lampiran Bukti']
   ];
 
   tx.forEach((t, i) => {
     const deb = t.dir === 'in' ? t.amount : 0;
+    const isHonor = (t.cat === 'honor');
     const krd = t.dir === 'out' ? t.amount : 0;
-    saldo += deb - krd;
+    const krdKas = (isDirect && isHonor) ? 0 : krd;
+    saldo += deb - krdKas;
+
+    let sumber = 'Rek. Bendahara';
+    if (t.dir === 'in') {
+      sumber = 'Termin Hibah (Masuk)';
+    } else if (isHonor) {
+      sumber = isDirect ? 'Direct Unair (Bukan Kas)' : 'Kas Bendahara';
+    }
+
     rows.push([
       i + 1,
       t.date,
       t.ref || '',
       CAT_IN[t.cat] || CAT_OUT[t.cat] || t.cat,
       t.note || '',
+      sumber,
       deb,
-      krd,
+      krdKas,
       saldo,
       t.proof ? 'Ada Bukti (' + (t.proof_name || 'Tersimpan') + ')' : (t.dir === 'out' ? 'Belum Ada Nota' : 'Penerimaan')
     ]);
