@@ -4606,6 +4606,50 @@ function vPajak() {
   '</div>';
 }
 
+window.onCoretaxTinSourceChange = function(val) {
+  const tinInput = $('#xml-tin');
+  if (!tinInput) return;
+  if (val === 'ketua') {
+    tinInput.value = '3578047105750010';
+  } else {
+    tinInput.value = '';
+    tinInput.focus();
+  }
+  updateNitkuHint();
+};
+
+window.setCoretaxTin = function(val, source) {
+  const tinInput = $('#xml-tin');
+  if (tinInput) {
+    tinInput.value = val;
+    if (!val) tinInput.focus();
+  }
+  const sel = $('#xml-tin-source');
+  if (sel) sel.value = source || (val === '3578047105750010' ? 'ketua' : 'manual');
+  updateNitkuHint();
+};
+
+window.updateNitkuHint = function() {
+  const val = ($('#xml-tin') ? $('#xml-tin').value : '').replace(/\D/g, '');
+  const hint = $('#xml-nitku-hint');
+  const sel = $('#xml-tin-source');
+  if (sel) {
+    sel.value = (val === '3578047105750010') ? 'ketua' : 'manual';
+  }
+  if (!hint) return;
+  if (!val) {
+    hint.style.color = 'var(--muted)';
+    hint.innerHTML = '⚠️ Masukkan 16 digit NIK/NPWP akun Coretax yang sedang aktif login.';
+  } else if (val === '3578047105750010') {
+    hint.style.color = 'var(--ok)';
+    hint.innerHTML = '✓ NITKU Pemotong: <b>3578047105750010000000</b> (Akun Ketua Peneliti Dr. Siti Rahayu Nadhiroh — Valid Coretax)';
+  } else {
+    const nitku = (val + '000000').slice(0, 22);
+    hint.style.color = 'var(--info)';
+    hint.innerHTML = '🏛️ NITKU Pemotong yang akan diekspor: <b>' + nitku + '</b> (Pastikan terdaftar di akun Coretax Anda)';
+  }
+};
+
 function sheetExportCoretaxXML() {
   const p = P();
   const pays = payrollsOf(p.id);
@@ -4614,7 +4658,24 @@ function sheetExportCoretaxXML() {
     return;
   }
 
-  const savedTin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '3578047105750010';
+  // Bersihkan cache dummy lama
+  if (localStorage.getItem('zanfin_coretax_tin') === '3578015505790001') {
+    localStorage.removeItem('zanfin_coretax_tin');
+  }
+  if (p.tin === '3578015505790001') {
+    delete p.tin;
+    saveState();
+  }
+
+  const KETUA_NIK = '3578047105750010';
+  const KETUA_NAME = 'Dr. Siti Rahayu Nadhiroh';
+
+  let currentTin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '';
+  if (currentTin === '3578015505790001') currentTin = '';
+
+  // Default otomatis ke Ketua jika kosong
+  if (!currentTin) currentTin = KETUA_NIK;
+  const isKetua = (currentTin === KETUA_NIK);
 
   const body = '<div class="stack" style="gap:12px">' +
     '<div class="card" style="background:linear-gradient(135deg,rgba(2,132,199,0.1),rgba(14,165,233,0.05));border-left:4px solid var(--info);padding:12px">' +
@@ -4622,9 +4683,26 @@ function sheetExportCoretaxXML() {
       '<p class="tiny muted" style="margin:4px 0 0;line-height:1.45">ID Tempat Usaha diformat 22 digit resmi (<code>[NIK]+000000</code>) dan tarif enumerator otomatis disesuaikan dengan aturan validasi Coretax.</p>' +
     '</div>' +
 
-    fld('NPWP / NIK Pemotong (Akun Login Coretax Anda)',
-      '<input id="xml-tin" value="' + esc(savedTin) + '" placeholder="16 digit NIK/NPWP akun Anda" class="num" maxlength="16">',
-      '⚠️ Wajib sama persis dengan NIK/NPWP akun yang sedang Anda gunakan saat login di pojok kiri atas Coretax!') +
+    fld('Pilihan Akun Pemotong Pajak (Coretax DJP)',
+      '<select id="xml-tin-source" onchange="onCoretaxTinSourceChange(this.value)">' +
+        '<option value="ketua" ' + (isKetua ? 'selected' : '') + '>👩‍💼 NIK Ketua Peneliti (' + KETUA_NAME + ' — ' + KETUA_NIK + ')</option>' +
+        '<option value="manual" ' + (!isKetua ? 'selected' : '') + '>✏️ Kosongkan / Input NIK Pemotong Lainnya...</option>' +
+      '</select>',
+      'Pilih NIK Ketua Peneliti atau input akun Coretax lain yang sedang Anda gunakan untuk login.') +
+
+    fld('NPWP / NIK Pemotong (16 Digit)',
+      '<div style="display:flex;gap:6px">' +
+        '<input id="xml-tin" value="' + esc(currentTin) + '" placeholder="16 digit NIK/NPWP akun Anda" class="num" maxlength="16" style="flex:1" oninput="updateNitkuHint()">' +
+        '<button type="button" class="btn xs ghost" style="align-self:center;white-space:nowrap" onclick="setCoretaxTin(\'\', \'manual\')">✕ Kosongkan</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">' +
+        '<button type="button" class="btn xs outline" style="font-size:11px" onclick="setCoretaxTin(\'' + KETUA_NIK + '\', \'ketua\')">⚡ Pasang NIK Ketua Peneliti (' + KETUA_NIK + ')</button>' +
+      '</div>' +
+      '<div id="xml-nitku-hint" class="tiny" style="margin-top:5px;line-height:1.4;' + (isKetua ? 'color:var(--ok)' : 'color:var(--info)') + '">' +
+        (isKetua 
+          ? '✓ NITKU Pemotong: <b>' + KETUA_NIK + '000000</b> (Akun Ketua Peneliti — Terdaftar Resmi di Coretax)'
+          : (currentTin ? '🏛️ NITKU Pemotong yang akan diekspor: <b>' + (currentTin + '000000').slice(0, 22) + '</b>' : '⚠️ Masukkan 16 digit NIK/NPWP akun Coretax yang sedang aktif login.')) +
+      '</div>') +
 
     '<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
       fld('Masa Pajak (Bulan)',
