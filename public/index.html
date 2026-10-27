@@ -5036,20 +5036,39 @@ window.sheetBpSewa = function (id) {
 
 window.sheetBpPickSewa = function () {
   const p = P();
-  const list = txnsOf(p.id)
+  window.__bpPick = txnsOf(p.id)
     .filter(t => t.dir === 'out' && t.cat !== 'honor' && !bpSewaTypeOf(t))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 40);
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   sheet('Tandai Transaksi Sewa',
-    list.length
-      ? '<div class="stack" style="gap:8px"><p class="tiny muted" style="margin:0">Pilih transaksi kas keluar yang merupakan sewa rumah atau kendaraan.</p>' +
-        list.map(t =>
-          '<button class="card" style="text-align:left;width:100%;background:var(--panel2);padding:10px" onclick="closeSheet();sheetBpSewa(\'' + t.id + '\')">' +
-            '<b>' + esc(t.vendor || t.note || t.ref || 'Transaksi') + '</b>' +
-            '<div class="tiny muted">' + fdl(t.date) + ' · ' + rpC(t.gross || t.amount) + '</div>' +
-          '</button>').join('') + '</div>'
-      : '<p class="muted small">Tidak ada transaksi kas keluar lain yang bisa ditandai.</p>',
+    '<div class="stack" style="gap:8px">' +
+      '<input type="search" id="bp-q" placeholder="Cari: sewa, rumah, mobil, nama vendor..." oninput="bpPickFilter()" style="width:100%">' +
+      '<p class="tiny muted" id="bp-count" style="margin:0"></p>' +
+      '<div id="bp-list" class="stack" style="gap:8px"></div>' +
+    '</div>',
     'Tutup', () => closeSheet(), 'outline');
+  bpPickFilter();
+};
+
+window.bpPickFilter = function () {
+  const all = window.__bpPick || [];
+  const q = ($('#bp-q') ? $('#bp-q').value : '').trim().toLowerCase();
+  const txt = t => [t.vendor, t.note, t.ref, CAT_OUT[t.cat]].join(' ');
+  const likelyRe = /\bsewa\b|rental|posko|homestay|penginapan|villa|kontrak|kost|mobil|motor|kendaraan|travel|\bbus\b|\belf\b/i;
+  let list = all.filter(t => !q || txt(t).toLowerCase().includes(q));
+  const likely = t => likelyRe.test(txt(t));
+  if (!q) list = list.filter(likely).concat(list.filter(t => !likely(t)));
+  const shown = list.slice(0, 200);
+  const cnt = $('#bp-count');
+  if (cnt) cnt.textContent = 'Menampilkan ' + shown.length + ' dari ' + all.length + ' transaksi kas keluar' + (list.length > shown.length ? ' (persempit dengan pencarian)' : '');
+  const box = $('#bp-list');
+  if (!box) return;
+  box.innerHTML = shown.length ? shown.map(t =>
+    '<button class="card" style="text-align:left;width:100%;background:var(--panel2);padding:10px" onclick="closeSheet();sheetBpSewa(\'' + t.id + '\')">' +
+      '<b>' + esc(t.vendor || t.note || t.ref || 'Transaksi') + '</b>' +
+      (likely(t) ? ' <span class="pill ok" style="font-size:9.5px">kemungkinan sewa</span>' : '') +
+      '<div class="tiny muted">' + fdl(t.date) + ' · ' + rpC(t.gross || t.amount) + ' · ' + esc(CAT_OUT[t.cat] || t.cat || '') + '</div>' +
+    '</button>').join('')
+    : '<p class="muted small">Tidak ada transaksi yang cocok. Kalau sewa belum dicatat di Kas Keluar, catat dulu di menu Kas.</p>';
 };
 
 function bpDownload(name, mime, content) {
