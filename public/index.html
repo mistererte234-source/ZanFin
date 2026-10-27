@@ -1100,6 +1100,8 @@ const CAT_OUT = {
   bahan: 'Bahan Habis Pakai / ATK / Reagen Lab',
   alat: 'Sewa & Pengadaan Alat Penelitian',
   perjalanan: 'Transport & Akomodasi Lapangan',
+  sewa_rumah: 'Sewa Rumah / Posko (PPh 4(2) Final 10%)',
+  sewa_kendaraan: 'Sewa Kendaraan (PPh 23 2%)',
   publikasi: 'Publikasi Jurnal & Prosiding Seminar',
   ops: 'FGD, Konsumsi & Operasional Riset'
 };
@@ -3569,7 +3571,7 @@ function vKas() {
   else if (kasFilter === 'out') list = list.filter(t => t.dir === 'out');
   else if (kasFilter === 'honor') list = list.filter(t => t.cat === 'honor');
   else if (kasFilter === 'non_honor') list = list.filter(t => t.dir === 'out' && t.cat !== 'honor');
-  else if (kasFilter === 'sewa') list = list.filter(t => (t.note && t.note.toLowerCase().includes('sewa')) || t.id.includes('sewa') || t.id.includes('mobil') || t.id.includes('motor'));
+  else if (kasFilter === 'sewa') list = list.filter(t => t.cat === 'sewa_rumah' || t.cat === 'sewa_kendaraan' || (t.note && t.note.toLowerCase().includes('sewa')) || t.id.includes('sewa') || t.id.includes('mobil') || t.id.includes('motor'));
   else if (kasFilter !== 'semua') list = list.filter(t => t.cat === kasFilter);
 
   if (kasSearch) {
@@ -3818,6 +3820,14 @@ function sheetKasOut() {
       ) +
       fld('Nominal Total (Rp)', moneyIn('f-amount')) +
       fld('Nomor Kuitansi / Faktur / Nota', '<input id="f-ref" placeholder="Contoh: KWT-LAB-021 / FKT-991">') +
+      '<div id="f-sewa-box" class="card stack" style="display:none;gap:8px;background:var(--panel2);padding:12px;border-left:4px solid var(--info)">' +
+        '<b class="small">Data pemilik sewa (untuk bukti potong)</b>' +
+        fld('Nama pemilik / penyedia', '<input id="f-lname" placeholder="Sesuai KTP / NPWP">') +
+        fld('NIK / NPWP pemilik', '<input id="f-lid" class="num" inputmode="numeric" maxlength="24" placeholder="15 atau 16 digit">', 'Boleh dikosongkan dulu, tapi wajib terisi sebelum bukti potong dibuat') +
+        fld('Alamat (opsional)', '<input id="f-laddr">') +
+        '<label class="row" style="cursor:pointer;font-weight:600"><input type="checkbox" id="f-sewa-net" checked style="width:20px;height:20px" onchange="bpSewaFormUpdate()"><span>Pajak dipotong dari pembayaran ke pemilik</span></label>' +
+        '<div id="f-sewa-preview" class="tiny muted" style="line-height:1.5"></div>' +
+      '</div>' +
       fld('Keterangan Belanja', '<textarea id="f-note" placeholder="Keperluan penelitian..."></textarea>') +
       fld('Bukti Fisik Nota / Kuitansi / Faktur',
         '<input type="file" id="f-proof-out-preview-input" accept="image/*,application/pdf" style="display:none" onchange="handleProofFileSelect(event, \'f-proof-out-preview\')">' +
@@ -3842,6 +3852,11 @@ function sheetKasOut() {
         $('#sheet-e').textContent = 'Masukkan nominal pengeluaran.';
         return;
       }
+      const sw = bpSewaFromForm(cat, amount);
+      if (sw && sw.error) {
+        $('#sheet-e').textContent = sw.error;
+        return;
+      }
       S.txns.push({
         id: uid(),
         pid: p.id,
@@ -3861,7 +3876,8 @@ function sheetKasOut() {
         proof: currentProof ? currentProof.dataUrl : null,
         proof_name: currentProof ? currentProof.name : null,
         proof_type: currentProof ? currentProof.type : null,
-        void: false
+        void: false,
+        ...(sw ? sw.fields : {})
       });
       saveState();
       closeSheet();
@@ -3870,6 +3886,12 @@ function sheetKasOut() {
     }
   );
   setTimeout(() => renderProofPreview('f-proof-out-preview'), 50);
+  setTimeout(() => {
+    const c = $('#f-cat'), a = $('#f-amount');
+    if (c) c.addEventListener('change', bpSewaFormUpdate);
+    if (a) a.addEventListener('input', bpSewaFormUpdate);
+    bpSewaFormUpdate();
+  }, 60);
 }
 
 function sheetTxnDetail(id) {
@@ -4787,6 +4809,8 @@ function bpSewaTypeOf(t) {
   if (!t || t.dir !== 'out' || t.void) return null;
   if (t.sewa_type === 'none') return null;
   if (t.sewa_type && BP_SEWA[t.sewa_type]) return t.sewa_type;
+  if (t.cat === 'sewa_rumah') return 'rumah';
+  if (t.cat === 'sewa_kendaraan') return 'kendaraan';
   if ((t.tax_pph42 || 0) > 0) return 'rumah';
   const txt = [t.note, t.vendor, t.ref].join(' ');
   if ((t.tax_pph23 || 0) > 0 && /sewa|rental|mobil|motor|kendaraan/i.test(txt)) return 'kendaraan';
@@ -5069,6 +5093,47 @@ window.bpPickFilter = function () {
       '<div class="tiny muted">' + fdl(t.date) + ' · ' + rpC(t.gross || t.amount) + ' · ' + esc(CAT_OUT[t.cat] || t.cat || '') + '</div>' +
     '</button>').join('')
     : '<p class="muted small">Tidak ada transaksi yang cocok. Kalau sewa belum dicatat di Kas Keluar, catat dulu di menu Kas.</p>';
+};
+
+/* Dipakai form Kas Keluar: kategori sewa -> hitung pajak & simpan data pemilik */
+function bpSewaFromForm(cat, bruto) {
+  const type = cat === 'sewa_rumah' ? 'rumah' : (cat === 'sewa_kendaraan' ? 'kendaraan' : null);
+  if (!type) return null;
+  const def = BP_SEWA[type];
+  const name = ($('#f-lname') ? $('#f-lname').value : '').trim();
+  const nid = bpDigits($('#f-lid') ? $('#f-lid').value : '');
+  if (!name) return { error: 'Nama pemilik / penyedia sewa wajib diisi.' };
+  if (nid && !bpIdOk(nid)) return { error: 'NIK/NPWP harus 15 atau 16 digit (atau kosongkan dulu).' };
+  const tax = Math.round(bruto * def.rate);
+  const withheld = $('#f-sewa-net') ? $('#f-sewa-net').checked : true;
+  const fields = {
+    amount: withheld ? bruto - tax : bruto,
+    gross: bruto,
+    sewa_type: type,
+    lessor_name: name,
+    lessor_id: nid,
+    lessor_addr: ($('#f-laddr') ? $('#f-laddr').value : '').trim(),
+    vendor: name
+  };
+  fields[def.field] = tax;
+  return { fields };
+}
+
+window.bpSewaFormUpdate = function () {
+  const cat = $('#f-cat') ? $('#f-cat').value : '';
+  const box = $('#f-sewa-box');
+  if (!box) return;
+  const type = cat === 'sewa_rumah' ? 'rumah' : (cat === 'sewa_kendaraan' ? 'kendaraan' : null);
+  box.style.display = type ? '' : 'none';
+  const pv = $('#f-sewa-preview');
+  if (!type || !pv) return;
+  const def = BP_SEWA[type];
+  const bruto = parseN($('#f-amount').value);
+  const tax = Math.round(bruto * def.rate);
+  const withheld = $('#f-sewa-net') ? $('#f-sewa-net').checked : true;
+  pv.innerHTML = 'Isi nominal di atas sebagai <b>bruto</b> (sebelum pajak).<br>' +
+    def.pajak + ' ' + bpPct(def.rate) + ' = <b>' + rpC(tax) + '</b> · ' +
+    (withheld ? 'dibayar ke pemilik <b>' + rpC(bruto - tax) + '</b>' : 'dibayar ke pemilik <b>' + rpC(bruto) + '</b> (pajak di luar nominal ini)');
 };
 
 function bpDownload(name, mime, content) {
