@@ -4986,57 +4986,226 @@ function bpIssueList(issues) {
     : '';
 }
 
+/* ---- STATUS LAPOR & BAYAR (per masa per SPT, disimpan di proyek; baris ditandai saat terbit) ----
+   Alur: belum -> terbit (bukti potong terbit) -> billing (menunggu bayar) -> lunas (dibayar & dilaporkan)
+   Baris ditandai (bp_st/bp_masa/bp_gross) saat SPT masanya pertama kali diproses, supaya:
+   - XML berikutnya hanya berisi baris yang belum diproses;
+   - baris yang ditambahkan / diubah sesudahnya langsung kelihatan. */
+const BP_ST = {
+  belum: { label: 'Belum diproses', cls: 'warning' },
+  baru: { label: 'Baru, belum masuk bukti potong', cls: 'bad' },
+  ubah: { label: 'Berubah setelah bukti potong terbit', cls: 'bad' },
+  terbit: { label: 'Bukti potong terbit', cls: 'info' },
+  billing: { label: 'Menunggu bayar', cls: 'warning' },
+  lunas: { label: 'Lunas & dilaporkan', cls: 'ok' }
+};
+const BP_SPT = { UNI: 'SPT Masa PPh Unifikasi (sewa)', P21: 'SPT Masa PPh 21/26 (narasumber)' };
+const BP_PENDING = ['belum', 'baru'];
+let BP_FILTER = 'semua';
+
+const bpGrp = r => (r.jenis === 'Narasumber' ? 'P21' : 'UNI');
+const bpRec = r => (r.jenis === 'Narasumber' ? S.payrolls.find(x => x.id === r.id) : S.txns.find(x => x.id === r.id));
+const bpMasaLabel = m => {
+  const nm = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  return nm[Number(m.slice(5, 7)) - 1] + ' ' + m.slice(0, 4);
+};
+const bpRowComplete = r => r.gross > 0 && !!r.name && bpIdOk(r.nid);
+
+function bpRowSt(p, r) {
+  const rec = bpRec(r);
+  const masa = String(r.tgl || '').slice(0, 7);
+  const L = p.bpLapor || {};
+  if (rec && rec.bp_st) {
+    if (rec.bp_masa !== masa || Math.round(rec.bp_gross || 0) !== Math.round(r.gross || 0)) return 'ubah';
+    const m = L[rec.bp_masa + '|' + bpGrp(r)];
+    return (m && m.st && m.st !== 'belum') ? m.st : 'terbit';
+  }
+  const m = L[masa + '|' + bpGrp(r)];
+  return (m && m.st && m.st !== 'belum') ? 'baru' : 'belum';
+}
+
+function bpStPill(st) {
+  const d = BP_ST[st] || BP_ST.belum;
+  return '<span class="pill ' + d.cls + '" style="font-size:10.5px">' + (st === 'lunas' ? '✓ ' : (st === 'baru' || st === 'ubah') ? '⚠ ' : '') + d.label + '</span>';
+}
+
+function bpGroups(p, nar, sewa) {
+  const map = {};
+  nar.concat(sewa).forEach(r => {
+    const masa = String(r.tgl || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(masa)) return;
+    const g = bpGrp(r);
+    const k = masa + '|' + g;
+    if (!map[k]) map[k] = { key: k, masa, grp: g, rows: [], amt: 0, parts: {} };
+    map[k].rows.push(r);
+    map[k].amt += r.deposit;
+    map[k].parts[r.pajak] = (map[k].parts[r.pajak] || 0) + 1;
+  });
+  return Object.values(map)
+    .sort((a, b) => a.masa.localeCompare(b.masa) || a.grp.localeCompare(b.grp))
+    .map(x => {
+      const rec = (p.bpLapor || {})[x.key] || {};
+      x.rec = rec;
+      x.st = rec.st || 'belum';
+      const sts = x.rows.map(r => bpRowSt(p, r));
+      x.nBaru = sts.filter(s => s === 'baru').length;
+      x.nUbah = sts.filter(s => s === 'ubah').length;
+      x.nBelum = sts.filter(s => s === 'belum').length;
+      return x;
+    });
+}
+
+window.bpSetFilter = function (f) { BP_FILTER = f; render(); };
+
+function bpPassFilter(st) {
+  if (BP_FILTER === 'belum') return st === 'belum' || st === 'baru' || st === 'ubah';
+  if (BP_FILTER === 'proses') return st === 'terbit' || st === 'billing';
+  if (BP_FILTER === 'lunas') return st === 'lunas';
+  return true;
+}
+
+window.sheetBpStatus = function (key) {
+  const p = P();
+  const g = bpGroups(p, bpNarasumberRows(p.id), bpSewaRows(p.id)).find(x => x.key === key);
+  if (!g) return;
+  const rec = g.rec || {};
+  const firstTime = g.st === 'belum';
+  const stampable = g.rows.filter(r => BP_PENDING.includes(bpRowSt(p, r)) && bpRowComplete(r));
+  const opt = (v, l) => '<option value="' + v + '"' + ((rec.st || 'belum') === v ? ' selected' : '') + '>' + l + '</option>';
+  sheet(bpMasaLabel(g.masa) + ' · ' + BP_SPT[g.grp],
+    '<div class="stack">' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">Total pajak di ZanFin: <b>' + rpC(g.amt) + '</b> (' +
+        Object.entries(g.parts).map(([k, v]) => k + ': ' + v + ' bukti potong').join(' · ') + '). Samakan dengan kode billing.</p>' +
+      fld('Status',
+        '<select id="bs-st">' +
+          opt('belum', 'Belum diproses') +
+          opt('terbit', 'Bukti potong sudah terbit di Coretax') +
+          opt('billing', 'SPT dibuat, kode billing terbit, menunggu bayar') +
+          opt('lunas', 'Sudah dibayar & SPT dilaporkan') +
+        '</select>') +
+      fld('Kode billing', '<input id="bs-billing" class="num" inputmode="numeric" maxlength="20" value="' + esc(rec.billing || '') + '" placeholder="15 digit">') +
+      '<div class="grid2">' +
+        fld('Nominal billing (Rp)', moneyIn('bs-nominal', rec.nominal || g.amt)) +
+        fld('Masa aktif billing', '<input type="date" id="bs-aktif" value="' + esc(rec.aktif || '') + '">') +
+      '</div>' +
+      '<div class="grid2">' +
+        fld('Tanggal bayar', '<input type="date" id="bs-tgl" value="' + esc(rec.tglBayar || '') + '">') +
+        fld('NTPN', '<input id="bs-ntpn" maxlength="24" value="' + esc(rec.ntpn || '') + '" placeholder="dari bukti bayar">') +
+      '</div>' +
+      fld('Catatan', '<input id="bs-note" value="' + esc(rec.note || '') + '" placeholder="opsional">') +
+      (stampable.length
+        ? '<label class="row" style="cursor:pointer;font-weight:600;gap:8px"><input type="checkbox" id="bs-stamp"' + (firstTime ? ' checked' : '') + ' style="width:20px;height:20px">' +
+          '<span>Tandai ' + stampable.length + ' baris ' + (firstTime ? 'masa ini' : 'baru') + ' sebagai sudah masuk bukti potong</span></label>' +
+          (firstTime ? '' : '<p class="tiny muted" style="margin:0">Centang hanya jika baris baru itu memang sudah diimpor dan diterbitkan di Coretax.</p>')
+        : '') +
+    '</div>',
+    'Simpan Status',
+    () => {
+      const st = $('#bs-st').value;
+      const billing = bpDigits($('#bs-billing').value);
+      const tgl = $('#bs-tgl').value;
+      const ntpn = $('#bs-ntpn').value.trim().toUpperCase();
+      if ((st === 'billing' || st === 'lunas') && billing.length !== 15) { $('#sheet-e').textContent = 'Kode billing harus 15 digit.'; return; }
+      if (st === 'lunas' && (!tgl || !ntpn)) { $('#sheet-e').textContent = 'Untuk status lunas, isi tanggal bayar dan NTPN.'; return; }
+      if (!p.bpLapor) p.bpLapor = {};
+      if (st === 'belum') {
+        if (!confirm('Kembalikan ke "Belum diproses"? Tanda sudah terbit pada baris masa ini akan dihapus.')) return;
+        g.rows.forEach(r => {
+          const rec2 = bpRec(r);
+          if (rec2 && rec2.bp_masa === g.masa) { delete rec2.bp_st; delete rec2.bp_masa; delete rec2.bp_gross; delete rec2.bp_at; }
+        });
+        delete p.bpLapor[key];
+      } else {
+        p.bpLapor[key] = {
+          st, billing, nominal: parseN($('#bs-nominal').value) || 0, aktif: $('#bs-aktif').value || '',
+          tglBayar: tgl || '', ntpn, note: $('#bs-note').value.trim(),
+          updatedAt: Date.now(), by: (typeof ME !== 'undefined' && ME && ME.name) || ''
+        };
+        const doStamp = $('#bs-stamp') ? $('#bs-stamp').checked : false;
+        if (doStamp) {
+          stampable.forEach(r => {
+            const rec2 = bpRec(r);
+            if (!rec2) return;
+            rec2.bp_st = 'terbit';
+            rec2.bp_masa = g.masa;
+            rec2.bp_gross = Math.round(r.gross || 0);
+            rec2.bp_at = Date.now();
+          });
+        }
+      }
+      saveState();
+      closeSheet();
+      toast('Status ' + bpMasaLabel(g.masa) + ' disimpan ✓');
+      render();
+    });
+};
+
 function vBukpot() {
   const p = P();
   const nar = bpNarasumberRows(p.id);
   const sewa = bpSewaRows(p.id);
-  const kend = sewa.filter(r => r.type === 'kendaraan');
-  const rmh = sewa.filter(r => r.type === 'rumah');
-  const sum = a => a.reduce((s, r) => s + r.deposit, 0);
-  const setoran = bpSetoran(nar, sewa);
-  const totalIssues = nar.concat(sewa).filter(r => r.issues.length).length;
+  const all = nar.concat(sewa);
+  const stOf = {};
+  all.forEach(r => { stOf[r.id] = bpRowSt(p, r); });
+  const groups = bpGroups(p, nar, sewa);
+  const sumBy = f => all.filter(r => f(stOf[r.id])).reduce((s, r) => s + r.deposit, 0);
+  const totalIssues = all.filter(r => r.issues.length).length;
+  const nPending = all.filter(r => BP_PENDING.includes(stOf[r.id])).length;
+  const nUbah = all.filter(r => stOf[r.id] === 'ubah').length;
 
-  const narCards = nar.length ? nar.map(r =>
-    '<div class="card" style="background:var(--panel2);padding:12px">' +
+  const rowCard = (r, kind) => {
+    const st = stOf[r.id];
+    const rec = bpRec(r) || {};
+    return '<div class="card" style="background:var(--panel2);padding:12px' + ((st === 'baru' || st === 'ubah') ? ';border-left:4px solid var(--bad)' : '') + '">' +
       '<div class="row between" style="align-items:flex-start;gap:8px">' +
-        '<div><b>' + esc(r.name) + '</b><div class="tiny muted">' + esc(r.kegiatan) + '</div></div>' +
-        bpPill(r.issues) +
+        '<div><b>' + esc(r.name || '(nama belum diisi)') + '</b><div class="tiny muted">' +
+          (kind === 'nar' ? esc(r.kegiatan) : esc(r.jenis) + ' · ' + esc(r.note)) + '</div></div>' +
+        '<div class="stack" style="gap:4px;align-items:flex-end">' + bpStPill(st) + (BP_PENDING.includes(st) ? bpPill(r.issues) : '') + '</div>' +
       '</div>' +
       '<div class="tiny" style="margin-top:6px;line-height:1.6">' +
         'NIK/NPWP: <b>' + esc(r.nid || '—') + '</b><br>' +
         'Tgl bayar: ' + (r.tgl ? fdl(r.tgl) : '—') + ' · Ref: ' + esc(r.ref || '—') + '<br>' +
-        'Bruto: <b>' + rpC(r.gross) + '</b> · PPh 21: <b>' + rpC(r.amt) + '</b><br>' +
-        '<span class="muted">' + esc(r.dasar) + '</span>' +
+        'Bruto: <b>' + rpC(r.gross) + '</b> · ' + esc(r.pajak) + (kind === 'nar' ? '' : ' ' + bpPct(r.rate)) + ': <b>' + rpC(r.deposit) + '</b>' +
+        (kind === 'nar' ? '<br><span class="muted">' + esc(r.dasar) + '</span>' : '') +
       '</div>' +
-      bpIssueList(r.issues) +
-      '<div class="row" style="margin-top:8px"><button class="btn xs outline" onclick="bpCopy(\'nar\',\'' + r.id + '\')">📋 Salin data</button></div>' +
-    '</div>').join('')
-    : '<p class="muted small">Belum ada honor narasumber. Narasumber dikenali dari peran "Narasumber" atau "Pakar" di menu Tim.</p>';
-
-  const sewaCard = r =>
-    '<div class="card" style="background:var(--panel2);padding:12px">' +
-      '<div class="row between" style="align-items:flex-start;gap:8px">' +
-        '<div><b>' + esc(r.name || '(nama belum diisi)') + '</b><div class="tiny muted">' + esc(r.jenis) + ' · ' + esc(r.note) + '</div></div>' +
-        bpPill(r.issues) +
-      '</div>' +
-      '<div class="tiny" style="margin-top:6px;line-height:1.6">' +
-        'NIK/NPWP: <b>' + esc(r.nid || '—') + '</b><br>' +
-        'Tgl bayar: ' + (r.tgl ? fdl(r.tgl) : '—') + ' · Ref: ' + esc(r.ref || '—') + '<br>' +
-        'Bruto: <b>' + rpC(r.gross) + '</b> · ' + esc(r.pajak) + ' ' + bpPct(r.rate) + ': <b>' + rpC(r.deposit) + '</b>' +
-      '</div>' +
-      bpIssueList(r.issues) +
+      (st === 'baru' ? '<p class="tiny" style="margin:6px 0 0;color:var(--bad)">Ditambahkan setelah SPT masa ' + bpMasaLabel(String(r.tgl).slice(0, 7)) + ' diproses. Ikut di XML berikutnya, lalu perlu bukti potong dan pembetulan SPT. Tanyakan ke KPP.</p>' : '') +
+      (st === 'ubah' ? '<p class="tiny" style="margin:6px 0 0;color:var(--bad)">Tanggal atau nominal berubah setelah bukti potong terbit (tercatat masa ' + bpMasaLabel(rec.bp_masa || '') + ', bruto ' + rpC(rec.bp_gross || 0) + '). Perlu pembetulan di Coretax. Tanyakan ke KPP.</p>' : '') +
+      (BP_PENDING.includes(st) ? bpIssueList(r.issues) : '') +
       '<div class="row" style="margin-top:8px;gap:8px">' +
-        '<button class="btn xs outline" onclick="sheetBpSewa(\'' + r.id + '\')">✏️ Lengkapi data</button>' +
-        '<button class="btn xs outline" onclick="bpCopy(\'sewa\',\'' + r.id + '\')">📋 Salin data</button>' +
+        (kind === 'sewa' ? '<button class="btn xs outline" onclick="sheetBpSewa(\'' + r.id + '\')">✏️ Lengkapi data</button>' : '') +
+        '<button class="btn xs outline" onclick="bpCopy(\'' + kind + '\',\'' + r.id + '\')">📋 Salin data</button>' +
       '</div>' +
     '</div>';
+  };
 
-  const setoranRows = setoran.length ? setoran.map(s =>
-    '<tr>' +
-      '<td>' + esc(s.masa) + '</td><td>' + esc(s.pajak) + '</td><td style="text-align:center">' + s.n + '</td>' +
-      '<td style="text-align:right">' + fmtN(s.amt) + '</td><td>' + fdl(s.setor) + '</td><td>' + fdl(s.lapor) + '</td>' +
-    '</tr>').join('')
-    : '<tr><td colspan="6" class="muted small">Belum ada data.</td></tr>';
+  const narShown = nar.filter(r => bpPassFilter(stOf[r.id]));
+  const sewaShown = sewa.filter(r => bpPassFilter(stOf[r.id]));
+  const kendShown = sewaShown.filter(r => r.type === 'kendaraan');
+  const rmhShown = sewaShown.filter(r => r.type === 'rumah');
+
+  const groupCards = groups.length ? groups.map(g => {
+    const rec = g.rec || {};
+    const due = 'Setor sebelum ' + fdl(bpDue(g.masa, 10)) + ' (aman) · lapor ' + fdl(bpDue(g.masa, 20));
+    return '<div class="card" style="background:var(--panel2);padding:12px">' +
+      '<div class="row between" style="align-items:flex-start;gap:8px">' +
+        '<div><b>' + bpMasaLabel(g.masa) + '</b> · <span class="small">' + BP_SPT[g.grp] + '</span>' +
+          '<div class="tiny muted">' + Object.entries(g.parts).map(([k, v]) => k + ': ' + v).join(' · ') + ' · total <b>' + rpC(g.amt) + '</b></div></div>' +
+        bpStPill(g.st) +
+      '</div>' +
+      '<div class="tiny" style="margin-top:6px;line-height:1.6">' +
+        (g.st === 'belum' ? '<span class="muted">' + due + '</span>' : '') +
+        (rec.billing ? 'Kode billing: <b>' + esc(rec.billing) + '</b>' + (rec.nominal ? ' · ' + rpC(rec.nominal) : '') + (rec.aktif && g.st === 'billing' ? ' · aktif s/d ' + fdl(rec.aktif) : '') + '<br>' : '') +
+        (g.st === 'lunas' ? 'Dibayar ' + (rec.tglBayar ? fdl(rec.tglBayar) : '—') + ' · NTPN <b>' + esc(rec.ntpn || '—') + '</b><br>' : '') +
+        (rec.nominal && Math.round(rec.nominal) !== Math.round(g.amt) && g.st !== 'belum' ? '<span style="color:var(--bad)">⚠ Nominal billing berbeda dari total ZanFin (' + rpC(g.amt) + ')</span><br>' : '') +
+        (g.nBaru ? '<span style="color:var(--bad)">⚠ ' + g.nBaru + ' baris baru belum masuk bukti potong</span><br>' : '') +
+        (g.nUbah ? '<span style="color:var(--bad)">⚠ ' + g.nUbah + ' baris berubah setelah bukti potong terbit</span><br>' : '') +
+        (rec.by ? '<span class="muted">Diperbarui oleh ' + esc(rec.by) + '</span>' : '') +
+      '</div>' +
+      '<div class="row" style="margin-top:8px"><button class="btn xs outline" onclick="sheetBpStatus(\'' + g.key + '\')">Perbarui status</button></div>' +
+    '</div>';
+  }).join('') : '<p class="muted small">Belum ada data.</p>';
+
+  const chip = (f, l) => '<button class="btn xs' + (BP_FILTER === f ? ' pri' : ' outline') + '" onclick="bpSetFilter(\'' + f + '\')">' + l + '</button>';
 
   return '<div class="stack">' +
     backBar('Bukti Potong: Narasumber &amp; Sewa') +
@@ -5044,26 +5213,35 @@ function vBukpot() {
     '<div class="card" style="border-left:4px solid var(--warning);padding:12px">' +
       '<b style="font-size:12.5px">Ini lembar kerja, bukan bukti potong resmi</b>' +
       '<p class="tiny muted" style="margin:4px 0 0;line-height:1.5">Bukti potong resmi diterbitkan lewat Coretax/e-Bupot oleh pemotong yang sah. ' +
-      'Data di bawah disiapkan agar Ketua tinggal menyalin atau mengunggah. Konfirmasi ke bagian pajak UNAIR bahwa akun Ketua boleh menjadi pemotong untuk ketiga jenis pajak ini. ' +
-      'Kode objek pajak dan format impor belum diverifikasi di sini, cek ke panduan resmi Coretax.</p>' +
+      'Status di halaman ini diisi manual agar admin tahu mana yang sudah terbit, menunggu bayar, dan lunas.</p>' +
     '</div>' +
 
     '<button class="btn block" style="text-align:left;padding:12px 14px" onclick="go(null, \'panduanbukpot\')">📘 <b>Panduan lengkap: dari ZanFin ke Coretax</b><div class="tiny muted">Langkah demi langkah, bisa disimpan sebagai PDF</div></button>' +
 
     '<div class="card" style="background:var(--hero);color:var(--hero-ink)">' +
-      '<div class="lab" style="color:var(--hero-muted)">Total pajak yang dipotong (narasumber + sewa)</div>' +
-      '<div class="big">' + bigRp(sum(nar) + sum(sewa)) + '</div>' +
+      '<div class="lab" style="color:var(--hero-muted)">Total pajak dipotong (narasumber + sewa)</div>' +
+      '<div class="big">' + bigRp(all.reduce((s, r) => s + r.deposit, 0)) + '</div>' +
       '<div class="flow">' +
-        '<div>PPh 21 Narasumber<b>' + rpC(sum(nar)) + '</b></div>' +
-        '<div>PPh 23 Kendaraan<b>' + rpC(sum(kend)) + '</b></div>' +
-        '<div>PPh 4(2) Rumah<b>' + rpC(sum(rmh)) + '</b></div>' +
+        '<div>Lunas<b>' + rpC(sumBy(s => s === 'lunas')) + '</b></div>' +
+        '<div>Menunggu bayar<b>' + rpC(sumBy(s => s === 'billing' || s === 'terbit')) + '</b></div>' +
+        '<div>Belum diproses<b>' + rpC(sumBy(s => BP_PENDING.includes(s))) + '</b></div>' +
       '</div>' +
-      '<div class="tiny" style="margin-top:8px;color:var(--hero-muted)">' + (totalIssues ? '⚠️ ' + totalIssues + ' baris perlu dilengkapi sebelum bukti potong dibuat' : '✓ Semua baris lengkap') + '</div>' +
+      '<div class="tiny" style="margin-top:8px;color:var(--hero-muted)">' +
+        (nPending ? nPending + ' baris belum masuk bukti potong' : '✓ Semua baris sudah masuk bukti potong') +
+        (nUbah ? ' · ⚠ ' + nUbah + ' baris berubah setelah terbit' : '') +
+        (totalIssues ? ' · ⚠ ' + totalIssues + ' baris datanya belum lengkap' : '') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card stack" style="gap:10px">' +
+      '<h3 style="margin:0">Status SPT per masa</h3>' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">Satu kartu = satu SPT di Coretax (satu kode billing). Perbarui statusnya setiap selesai satu tahap: terbit → menunggu bayar → lunas.</p>' +
+      groupCards +
     '</div>' +
 
     '<div class="card stack" style="gap:8px">' +
       '<h3 style="margin:0">Berkas impor Coretax (XML)</h3>' +
-      '<p class="tiny muted" style="margin:0;line-height:1.5">Unggah ke Coretax supaya bukti potong terbuat sekaligus, tanpa ketik satu per satu. Coba dengan 1 data dulu.</p>' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">XML hanya berisi baris yang <b>belum diproses</b>, jadi data yang sudah terbit tidak terimpor dua kali.</p>' +
       '<div class="row" style="gap:8px">' +
         '<button class="btn pri block" style="flex:1" onclick="sheetBpXml(\'nar\')">XML BP21 Narasumber</button>' +
         '<button class="btn pri block" style="flex:1" onclick="sheetBpXml(\'sewa\')">XML BPPU Sewa</button>' +
@@ -5075,19 +5253,17 @@ function vBukpot() {
       '<button class="btn block" style="flex:1" onclick="bpExportCsv()">📊 CSV</button>' +
     '</div>' +
 
-    '<div class="card">' +
-      '<h3 style="margin-bottom:6px">Setoran &amp; pelaporan per masa pajak</h3>' +
-      '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">' +
-        '<thead><tr style="text-align:left"><th>Masa</th><th>Pajak</th><th>Bukpot</th><th style="text-align:right">Setor (Rp)</th><th>Batas setor</th><th>Batas lapor</th></tr></thead>' +
-        '<tbody>' + setoranRows + '</tbody></table></div>' +
-      '<p class="tiny muted" style="margin:6px 0 0;line-height:1.5">Batas 15 dan 20 bulan berikutnya adalah ketentuan umum yang saya temukan untuk PPh 23. Untuk PPh 21 dan PPh 4(2), cek ulang ke ketentuan resmi.</p>' +
+    '<div class="row" style="gap:6px;flex-wrap:wrap">' +
+      chip('semua', 'Semua') + chip('belum', 'Belum diproses') + chip('proses', 'Menunggu bayar') + chip('lunas', 'Lunas') +
     '</div>' +
 
-    '<div class="card stack" style="gap:10px"><h3 style="margin:0">Narasumber (PPh 21) · ' + nar.length + '</h3>' + narCards + '</div>' +
+    '<div class="card stack" style="gap:10px"><h3 style="margin:0">Narasumber (PPh 21) · ' + narShown.length + (narShown.length !== nar.length ? ' dari ' + nar.length : '') + '</h3>' +
+      (narShown.length ? narShown.map(r => rowCard(r, 'nar')).join('') : '<p class="muted small">' + (nar.length ? 'Tidak ada baris untuk filter ini.' : 'Belum ada honor narasumber. Narasumber dikenali dari peran "Narasumber" atau "Pakar" di menu Tim.') + '</p>') +
+    '</div>' +
 
-    '<div class="card stack" style="gap:10px"><div class="row between"><h3 style="margin:0">Sewa · ' + sewa.length + '</h3>' +
+    '<div class="card stack" style="gap:10px"><div class="row between"><h3 style="margin:0">Sewa · ' + sewaShown.length + (sewaShown.length !== sewa.length ? ' dari ' + sewa.length : '') + '</h3>' +
       '<button class="btn xs outline" onclick="sheetBpPickSewa()">＋ Tandai transaksi sewa</button></div>' +
-      (sewa.length ? kend.concat(rmh).map(sewaCard).join('') : '<p class="muted small">Belum ada transaksi sewa terdeteksi. Gunakan tombol di atas untuk menandai transaksi kas keluar sebagai sewa rumah atau kendaraan.</p>') +
+      (sewaShown.length ? kendShown.concat(rmhShown).map(r => rowCard(r, 'sewa')).join('') : '<p class="muted small">' + (sewa.length ? 'Tidak ada baris untuk filter ini.' : 'Belum ada transaksi sewa terdeteksi. Pilih kategori sewa saat input Kas, atau gunakan tombol di atas.') + '</p>') +
     '</div>' +
   '</div>';
 }
@@ -5234,12 +5410,13 @@ const BP_SEWA_KOP = {
 
 const bpXmlEsc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function bpSewaXmlBuild(tin, month, year, docType) {
+function bpSewaXmlBuild(tin, month, year, docType, includeDone) {
   const p = P();
   const cleanTin = bpDigits(tin).padStart(16, '0');
   const pemotongId = (cleanTin + '000000').slice(0, 22);
   const all = bpSewaRows(p.id).filter(r => {
     if (!r.tgl) return false;
+    if (!includeDone && !BP_PENDING.includes(bpRowSt(p, r))) return false;
     if (month === 'all') return true;
     return Number(r.tgl.slice(5, 7)) === Number(month) && Number(r.tgl.slice(0, 4)) === Number(year);
   });
@@ -5279,8 +5456,12 @@ function bpSewaXmlBuild(tin, month, year, docType) {
 window.sheetBpXml = function (kind) {
   const p = P();
   const tin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '';
-  const rows = kind === 'nar' ? bpNarasumberRows(p.id) : bpSewaRows(p.id);
-  const months = Array.from(new Set(rows.map(r => String(r.tgl || '').slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m)))).sort();
+  const rowsAll = kind === 'nar' ? bpNarasumberRows(p.id) : bpSewaRows(p.id);
+  const pend = rowsAll.filter(r => BP_PENDING.includes(bpRowSt(p, r)));
+  const src = pend.length ? pend : rowsAll;
+  const cnt = {};
+  src.forEach(r => { const m = String(r.tgl || '').slice(0, 7); cnt[m] = (cnt[m] || 0) + 1; });
+  const months = Object.keys(cnt).filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
   const nm = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   sheet(kind === 'nar' ? 'XML BP21 · Narasumber (PPh 21)' : 'XML BPPU · Sewa (PPh 23 & 4(2))',
     '<div class="stack">' +
@@ -5292,9 +5473,13 @@ window.sheetBpXml = function (kind) {
       fld('NPWP / NIK Pemotong (akun Coretax Ketua)', '<input id="bx-tin" class="num" inputmode="numeric" maxlength="24" value="' + esc(tin) + '" placeholder="16 digit">') +
       fld('Masa pajak (bulan bayar)',
         '<select id="bx-month">' +
-          months.map(m => '<option value="' + m + '">' + nm[Number(m.slice(5)) - 1] + ' ' + m.slice(0, 4) + '</option>').join('') +
+          months.map(m => '<option value="' + m + '">' + nm[Number(m.slice(5)) - 1] + ' ' + m.slice(0, 4) + ' (' + cnt[m] + ' baris)</option>').join('') +
           '<option value="all">Semua masa</option>' +
         '</select>') +
+      (pend.length
+        ? '<p class="tiny" style="margin:0">Berisi ' + pend.length + ' baris yang <b>belum diproses</b>. Baris yang sudah terbit tidak ikut.</p>'
+        : '<p class="tiny" style="margin:0;color:var(--warning)">Semua baris sudah diproses. Centang di bawah hanya jika memang perlu impor ulang.</p>') +
+      '<label class="row" style="cursor:pointer;gap:8px"><input type="checkbox" id="bx-all" style="width:18px;height:18px"><span class="small">Sertakan baris yang sudah terbit (impor ulang)</span></label>' +
       fld('Jenis dokumen referensi',
         '<select id="bx-doc">' +
           '<option value="PaymentProof">Bukti pembayaran / kuitansi</option>' +
@@ -5310,16 +5495,17 @@ window.sheetBpXml = function (kind) {
       const month = sel === 'all' ? 'all' : String(Number(sel.slice(5)));
       const year = sel === 'all' ? (p.year || 2026) : Number(sel.slice(0, 4));
       const doc = $('#bx-doc').value;
+      const inc = $('#bx-all') ? $('#bx-all').checked : false;
       p.tin = t;
       localStorage.setItem('zanfin_coretax_tin', t);
       saveState();
       if (kind === 'nar') {
-        downloadBp21Xml(t, month, year, doc, 'coretax_05', true, true);
+        downloadBp21Xml(t, month, year, doc, 'coretax_05', true, true, !inc);
         closeSheet();
         return;
       }
-      const res = bpSewaXmlBuild(t, month, year, doc);
-      if (!res.count) { $('#sheet-e').textContent = 'Tidak ada baris sewa yang lengkap untuk masa ini (cek NIK/NPWP pemilik).'; return; }
+      const res = bpSewaXmlBuild(t, month, year, doc, inc);
+      if (!res.count) { $('#sheet-e').textContent = 'Tidak ada baris sewa yang perlu diekspor untuk masa ini (sudah diproses, atau NIK/NPWP pemilik belum lengkap).'; return; }
       bpDownload('BPPU_Coretax_Sewa_' + (sel === 'all' ? 'SemuaMasa' : sel) + '.xml', 'application/xml;charset=utf-8', res.xml);
       closeSheet();
       toast(res.count + ' bukti potong sewa diunduh' + (res.skipped ? ', ' + res.skipped + ' dilewati (data belum lengkap)' : '') + (res.mismatch ? ', ' + res.mismatch + ' berbeda dari pajak tercatat' : ''));
@@ -5340,20 +5526,17 @@ function bpTables() {
   const p = P();
   const nar = bpNarasumberRows(p.id);
   const sewa = bpSewaRows(p.id);
-  const narHead = ['No', 'Nama', 'NIK/NPWP', 'Kegiatan', 'Tgl bayar', 'No ref', 'Bruto', 'Dasar pemotongan', 'PPh 21 dipotong', 'Catatan cek'];
-  const narAoa = [narHead].concat(nar.map((r, i) => [i + 1, r.name, r.nid, r.kegiatan, r.tgl, r.ref, r.gross, r.dasar, r.amt, r.issues.join('; ')]));
-  const sewaHead = ['No', 'Jenis', 'Pajak', 'Nama pemilik', 'NIK/NPWP', 'Alamat', 'Tgl bayar', 'No ref', 'Bruto', 'Tarif', 'Pajak dipotong', 'Catatan cek'];
+  const lab = r => (BP_ST[bpRowSt(p, r)] || BP_ST.belum).label;
+  const narHead = ['No', 'Nama', 'NIK/NPWP', 'Kegiatan', 'Tgl bayar', 'No ref', 'Bruto', 'Dasar pemotongan', 'PPh 21 dipotong', 'Status', 'Catatan cek'];
+  const narAoa = [narHead].concat(nar.map((r, i) => [i + 1, r.name, r.nid, r.kegiatan, r.tgl, r.ref, r.gross, r.dasar, r.amt, lab(r), r.issues.join('; ')]));
+  const sewaHead = ['No', 'Jenis', 'Pajak', 'Nama pemilik', 'NIK/NPWP', 'Alamat', 'Tgl bayar', 'No ref', 'Bruto', 'Tarif', 'Pajak dipotong', 'Status', 'Catatan cek'];
   const mk = type => sewa.filter(r => r.type === type).map((r, i) =>
-    [i + 1, r.jenis, r.pajak, r.name, r.nid, r.addr, r.tgl, r.ref, r.gross, bpPct(r.rate), r.deposit, r.issues.join('; ')]);
-  const setoran = bpSetoran(nar, sewa);
-  const setHead = ['Masa', 'Pajak', 'Jumlah bukpot', 'Bruto', 'Pajak disetor', 'Batas setor', 'Batas lapor'];
-  const setAoa = [setHead].concat(setoran.map(s => [s.masa, s.pajak, s.n, s.gross, s.amt, s.setor, s.lapor]));
-  return {
-    nar: narAoa,
-    kend: [sewaHead].concat(mk('kendaraan')),
-    rumah: [sewaHead].concat(mk('rumah')),
-    setoran: setAoa
-  };
+    [i + 1, r.jenis, r.pajak, r.name, r.nid, r.addr, r.tgl, r.ref, r.gross, bpPct(r.rate), r.deposit, lab(r), r.issues.join('; ')]);
+  const groups = bpGroups(p, nar, sewa);
+  const setHead = ['Masa', 'SPT', 'Isi', 'Total pajak', 'Status', 'Kode billing', 'Nominal billing', 'Tgl bayar', 'NTPN', 'Catatan'];
+  const setAoa = [setHead].concat(groups.map(g => [g.masa, BP_SPT[g.grp], Object.entries(g.parts).map(([k, v]) => k + ': ' + v).join(', '), g.amt,
+    (BP_ST[g.st] || BP_ST.belum).label, g.rec.billing || '', g.rec.nominal || '', g.rec.tglBayar || '', g.rec.ntpn || '', g.rec.note || '']));
+  return { nar: narAoa, kend: [sewaHead].concat(mk('kendaraan')), rumah: [sewaHead].concat(mk('rumah')), setoran: setAoa };
 }
 
 window.bpExportXlsx = function () {
@@ -5363,7 +5546,7 @@ window.bpExportXlsx = function () {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.nar), 'Narasumber PPh21');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.kend), 'Sewa Kendaraan PPh23');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.rumah), 'Sewa Rumah PPh4-2');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.setoran), 'Setoran per Masa');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.setoran), 'Status SPT per Masa');
   XLSX.writeFile(wb, 'Lembar_Kerja_Bukti_Potong_' + (P().year || 2026) + '.xlsx');
 };
 
@@ -5375,7 +5558,7 @@ window.bpExportCsv = function () {
     block('NARASUMBER (PPh 21)', t.nar),
     block('SEWA KENDARAAN (PPh 23)', t.kend),
     block('SEWA RUMAH (PPh 4(2) Final)', t.rumah),
-    block('SETORAN PER MASA', t.setoran)
+    block('STATUS SPT PER MASA', t.setoran)
   ].join('\r\n\r\n');
   bpDownload('Lembar_Kerja_Bukti_Potong_' + (P().year || 2026) + '.csv', 'text/csv;charset=utf-8', csv);
 };
@@ -5513,6 +5696,20 @@ function pbBody() {
     'Cek status SPT berpindah dari <b>SPT Menunggu Pembayaran</b> ke <b>SPT Dilaporkan</b> ' + PB_CEK + '.'
   ]) +
 
+  '<h3>6.4 Tandai status di ZanFin</h3>' +
+  '<p>Supaya admin tahu mana yang sudah selesai, setiap SPT (satu kartu per masa di bagian <b>Status SPT per masa</b> halaman Bukti Potong) diperbarui statusnya:</p>' +
+  ol([
+    'Setelah bukti potong <b>terbit</b> di Coretax: ketuk <b>Perbarui status</b> → <b>Bukti potong sudah terbit</b>. Biarkan centang "Tandai n baris…" agar baris itu tidak ikut XML berikutnya.',
+    'Setelah <b>Bayar dan Lapor</b> dan kode billing terbit: status <b>Menunggu bayar</b>, lalu isi kode billing, nominal, dan masa aktif.',
+    'Setelah <b>dibayar</b>: status <b>Lunas &amp; dilaporkan</b>, lalu isi tanggal bayar dan NTPN.'
+  ]) +
+  ul([
+    'Label tiap baris: <b>Belum diproses</b> (ikut XML), <b>Bukti potong terbit</b>, <b>Menunggu bayar</b>, <b>Lunas &amp; dilaporkan</b>.',
+    '<b>Baru, belum masuk bukti potong</b>: transaksi ditambahkan setelah masa itu diproses. Perlu bukti potong tambahan dan pembetulan SPT, jadi tanyakan dulu ke KPP.',
+    '<b>Berubah setelah bukti potong terbit</b>: tanggal atau nominal diedit setelah terbit. Perlu pembetulan di Coretax.',
+    'Pakai tombol filter <b>Belum diproses / Menunggu bayar / Lunas</b> untuk melihat per kelompok.'
+  ]) +
+
   '<h2>7. Arsip untuk SPJ</h2>' +
   ul([
     '<b>PDF bukti potong:</b> unduh lewat ikon PDF merah di Telah Terbit (BPPU dan BP 21). Kirim salinannya ke masing-masing pemilik sewa dan narasumber.',
@@ -5531,6 +5728,8 @@ function pbBody() {
     ['SPT PPh 21 bernilai 0', 'Data bukti potong belum ditarik ke SPT', 'Klik <b>Posting</b> di konsep SPT. Pastikan bukti potong sudah Telah Terbit. Jika tetap 0, tunggu lalu Posting lagi, atau hapus konsep dan buat ulang.'],
     ['Bagian C (PPh 26) bernilai 0', 'Normal, karena untuk WP luar negeri', 'Abaikan.'],
     ['Impor XML ditolak', 'NIK/NPWP tidak valid, atau kode/tarif salah', 'Lihat Pesan Kesalahan di XML Monitoring. Perbaiki data di ZanFin, hapus draf yang salah, lalu impor ulang.'],
+    ['Bingung mana yang sudah lapor atau bayar', 'Status belum diperbarui', 'Perbarui status di kartu Status SPT per masa (bagian 6.4). Pakai filter di atas daftar.'],
+    ['XML kosong atau "sudah diproses"', 'Semua baris masa itu sudah ditandai terbit', 'Benar, tidak perlu impor lagi. Centang "Sertakan baris yang sudah terbit" hanya untuk impor ulang.'],
     ['Menu baru tidak muncul di ZanFin', 'Aplikasi masih versi lama (cache)', 'Tutup total aplikasi, atau refresh keras.']
   ]) +
 
@@ -5542,6 +5741,7 @@ function pbBody() {
     ['Tanggal 3–5', 'Ketua', 'Unduh XML BPPU Sewa dan XML BP21 Narasumber untuk masa lalu. Impor, cek, lalu Terbitkan.', '☐'],
     ['Tanggal 5–7', 'Ketua', 'Buat konsep SPT Unifikasi dan SPT PPh 21/26 (Posting). Cek angka, lalu Bayar dan Lapor.', '☐'],
     ['Sebelum tanggal 10', 'Ketua / Bendahara', 'Bayar semua kode billing. Simpan NTPN.', '☐'],
+    ['Setiap selesai satu tahap', 'Ketua / Admin', 'Perbarui status di ZanFin: terbit → menunggu bayar (kode billing) → lunas (NTPN).', '☐'],
     ['Sebelum tanggal 20', 'Ketua', 'Pastikan semua SPT berstatus Dilaporkan. Arsipkan PDF bukti potong, kode billing, dan bukti bayar.', '☐']
   ]) +
   note('Masih perlu dikonfirmasi ke UNAIR atau KPP',
@@ -5979,7 +6179,7 @@ window.triggerCoretaxDownload = function(format) {
   closeSheet();
 };
 
-function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf, onlyNar) {
+function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf, onlyNar, skipDone) {
   const p = P();
   const allPays = payrollsOf(p.id);
 
@@ -5997,6 +6197,9 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, exclude
     });
     if (filtered.length) {
       targetPays = filtered;
+    } else if (onlyNar) {
+      alert('Tidak ada honor narasumber di masa ' + mNum + '.');
+      return;
     } else {
       toast('Perhatian: Tidak ada kuitansi di bulan ' + mNum + ', mengekspor seluruh kuitansi.');
     }
@@ -6018,6 +6221,9 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, exclude
     });
   }
 
+  if (skipDone) {
+    targetPays = targetPays.filter(pay => !pay.bp_st);
+  }
   if (onlyNar) {
     targetPays = targetPays.filter(pay => {
       const w = S.workers.find(x => x.id === pay.wid);
