@@ -5050,6 +5050,15 @@ function vBukpot() {
       '<div class="tiny" style="margin-top:8px;color:var(--hero-muted)">' + (totalIssues ? '⚠️ ' + totalIssues + ' baris perlu dilengkapi sebelum bukti potong dibuat' : '✓ Semua baris lengkap') + '</div>' +
     '</div>' +
 
+    '<div class="card stack" style="gap:8px">' +
+      '<h3 style="margin:0">Berkas impor Coretax (XML)</h3>' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">Unggah ke Coretax supaya bukti potong terbuat sekaligus, tanpa ketik satu per satu. Coba dengan 1 data dulu.</p>' +
+      '<div class="row" style="gap:8px">' +
+        '<button class="btn pri block" style="flex:1" onclick="sheetBpXml(\'nar\')">XML BP21 Narasumber</button>' +
+        '<button class="btn pri block" style="flex:1" onclick="sheetBpXml(\'sewa\')">XML BPPU Sewa</button>' +
+      '</div>' +
+    '</div>' +
+
     '<div class="row" style="gap:8px">' +
       '<button class="btn pri block" style="flex:1" onclick="bpExportXlsx()">⬇️ Excel</button>' +
       '<button class="btn block" style="flex:1" onclick="bpExportCsv()">📊 CSV</button>' +
@@ -5201,6 +5210,109 @@ window.bpSewaFormUpdate = function () {
   pv.innerHTML = 'Isi nominal di atas sebagai <b>bruto</b> (sebelum pajak).<br>' +
     def.pajak + ' ' + bpPct(def.rate) + ' = <b>' + rpC(tax) + '</b> · ' +
     (withheld ? 'dibayar ke pemilik <b>' + rpC(bruto - tax) + '</b>' : 'dibayar ke pemilik <b>' + rpC(bruto) + '</b> (pajak di luar nominal ini)');
+};
+
+/* ---- XML impor Coretax: Bukti Potong Unifikasi (BPPU) untuk SEWA ----
+   Urutan elemen mengikuti contoh DJP "bppu.xml" (pajak.go.id, 2024-11-07). Kode objek pajak dan aturan isian
+   dibaca dari referensi pihak ketiga atas converter DJP v.3. BELUM DIUJI dengan unggahan nyata di akun Coretax Anda:
+   coba 1 data dulu. Coretax menghitung sendiri PPh = DPP x tarif. */
+const BP_SEWA_KOP = {
+  kendaraan: { kop: '24-100-02', rate: '2' },
+  rumah: { kop: '28-403-02', rate: '10' }
+};
+
+const bpXmlEsc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function bpSewaXmlBuild(tin, month, year, docType) {
+  const p = P();
+  const cleanTin = bpDigits(tin).padStart(16, '0');
+  const pemotongId = (cleanTin + '000000').slice(0, 22);
+  const all = bpSewaRows(p.id).filter(r => {
+    if (!r.tgl) return false;
+    if (month === 'all') return true;
+    return Number(r.tgl.slice(5, 7)) === Number(month) && Number(r.tgl.slice(0, 4)) === Number(year);
+  });
+  const ok = all.filter(r => r.gross > 0 && r.name && bpIdOk(r.nid) && bpDigits(r.nid) !== bpDigits(tin));
+  const skipped = all.length - ok.length;
+  const mismatch = ok.filter(r => r.recorded !== r.calc).length;
+  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  xml += '<!-- ZanFin: BPPU untuk impor Coretax, format contoh DJP bppu.xml. Belum diuji dengan unggahan nyata. ' + ok.length + ' bukti potong. -->\n';
+  xml += '<BpuBulk xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n';
+  xml += '\t<TIN>' + cleanTin + '</TIN>\n\t<ListOfBpu>\n';
+  ok.forEach(r => {
+    const cp = bpDigits(r.nid).padStart(16, '0');
+    const k = BP_SEWA_KOP[r.type];
+    const d = r.tgl;
+    xml += '\t\t<Bpu>\n';
+    xml += '\t\t\t<TaxPeriodMonth>' + Number(d.slice(5, 7)) + '</TaxPeriodMonth>\n';
+    xml += '\t\t\t<TaxPeriodYear>' + Number(d.slice(0, 4)) + '</TaxPeriodYear>\n';
+    xml += '\t\t\t<CounterpartTin>' + cp + '</CounterpartTin>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivityOfIncomeRecipient>' + (cp + '000000').slice(0, 22) + '</IDPlaceOfBusinessActivityOfIncomeRecipient>\n';
+    xml += '\t\t\t<TaxCertificate>N/A</TaxCertificate>\n';
+    xml += '\t\t\t<TaxObjectCode>' + k.kop + '</TaxObjectCode>\n';
+    xml += '\t\t\t<TaxBase>' + Math.round(r.gross) + '</TaxBase>\n';
+    xml += '\t\t\t<Rate>' + k.rate + '</Rate>\n';
+    xml += '\t\t\t<Document>' + bpXmlEsc(docType || 'PaymentProof') + '</Document>\n';
+    xml += '\t\t\t<DocumentNumber>' + bpXmlEsc(r.ref || ('KWT-' + r.id)) + '</DocumentNumber>\n';
+    xml += '\t\t\t<DocumentDate>' + d + '</DocumentDate>\n';
+    xml += '\t\t\t<IDPlaceOfBusinessActivity>' + pemotongId + '</IDPlaceOfBusinessActivity>\n';
+    xml += '\t\t\t<GovTreasurerOpt>N/A</GovTreasurerOpt>\n';
+    xml += '\t\t\t<SP2DNumber xsi:nil="true"/>\n';
+    xml += '\t\t\t<WithholdingDate>' + d + '</WithholdingDate>\n';
+    xml += '\t\t</Bpu>\n';
+  });
+  xml += '\t</ListOfBpu>\n</BpuBulk>\n';
+  return { xml, count: ok.length, skipped, mismatch };
+}
+
+window.sheetBpXml = function (kind) {
+  const p = P();
+  const tin = p.tin || p.npwp || localStorage.getItem('zanfin_coretax_tin') || '';
+  const rows = kind === 'nar' ? bpNarasumberRows(p.id) : bpSewaRows(p.id);
+  const months = Array.from(new Set(rows.map(r => String(r.tgl || '').slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m)))).sort();
+  const nm = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  sheet(kind === 'nar' ? 'XML BP21 · Narasumber (PPh 21)' : 'XML BPPU · Sewa (PPh 23 & 4(2))',
+    '<div class="stack">' +
+      '<p class="tiny muted" style="margin:0;line-height:1.5">' +
+        (kind === 'nar'
+          ? 'Berkas ini diimpor di Coretax lewat e-Bupot → BP 21 → Impor Data.'
+          : 'Berkas ini diimpor di Coretax lewat e-Bupot → BPPU (Unifikasi) → Impor Data. Kode objek pajak: sewa kendaraan 24-100-02 (2%), sewa rumah/bangunan 28-403-02 (10%). Cek kodenya di daftar Coretax sebelum unggah.') +
+        ' Format belum diuji dengan unggahan nyata: coba 1 data dulu.</p>' +
+      fld('NPWP / NIK Pemotong (akun Coretax Ketua)', '<input id="bx-tin" class="num" inputmode="numeric" maxlength="24" value="' + esc(tin) + '" placeholder="16 digit">') +
+      fld('Masa pajak (bulan bayar)',
+        '<select id="bx-month">' +
+          months.map(m => '<option value="' + m + '">' + nm[Number(m.slice(5)) - 1] + ' ' + m.slice(0, 4) + '</option>').join('') +
+          '<option value="all">Semua masa</option>' +
+        '</select>') +
+      fld('Jenis dokumen referensi',
+        '<select id="bx-doc">' +
+          '<option value="PaymentProof">Bukti pembayaran / kuitansi</option>' +
+          '<option value="Contract">Kontrak</option>' +
+          '<option value="CommercialInvoice">Surat tagihan / invoice</option>' +
+        '</select>') +
+    '</div>',
+    'Unduh XML',
+    () => {
+      const t = bpDigits($('#bx-tin').value);
+      if (t.length < 15) { $('#sheet-e').textContent = 'NPWP/NIK pemotong wajib 15 atau 16 digit.'; return; }
+      const sel = $('#bx-month').value;
+      const month = sel === 'all' ? 'all' : String(Number(sel.slice(5)));
+      const year = sel === 'all' ? (p.year || 2026) : Number(sel.slice(0, 4));
+      const doc = $('#bx-doc').value;
+      p.tin = t;
+      localStorage.setItem('zanfin_coretax_tin', t);
+      saveState();
+      if (kind === 'nar') {
+        downloadBp21Xml(t, month, year, doc, 'coretax_05', true, true);
+        closeSheet();
+        return;
+      }
+      const res = bpSewaXmlBuild(t, month, year, doc);
+      if (!res.count) { $('#sheet-e').textContent = 'Tidak ada baris sewa yang lengkap untuk masa ini (cek NIK/NPWP pemilik).'; return; }
+      bpDownload('BPPU_Coretax_Sewa_' + (sel === 'all' ? 'SemuaMasa' : sel) + '.xml', 'application/xml;charset=utf-8', res.xml);
+      closeSheet();
+      toast(res.count + ' bukti potong sewa diunduh' + (res.skipped ? ', ' + res.skipped + ' dilewati (data belum lengkap)' : '') + (res.mismatch ? ', ' + res.mismatch + ' berbeda dari pajak tercatat' : ''));
+    });
 };
 
 function bpDownload(name, mime, content) {
@@ -5613,7 +5725,7 @@ window.triggerCoretaxDownload = function(format) {
   closeSheet();
 };
 
-function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf) {
+function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, excludeSelf, onlyNar) {
   const p = P();
   const allPays = payrollsOf(p.id);
 
@@ -5652,8 +5764,15 @@ function downloadBp21Xml(tin, taxMonth, taxYear, docType, enumKopChoice, exclude
     });
   }
 
+  if (onlyNar) {
+    targetPays = targetPays.filter(pay => {
+      const w = S.workers.find(x => x.id === pay.wid);
+      return w && /narasumber|pakar/i.test(w.role || '');
+    });
+  }
+
   if (!targetPays.length) {
-    alert('Tidak ada transaksi kuitansi yang tersisa untuk diekspor (kuitansi terpilih milik Pemotong sendiri).');
+    alert('Tidak ada transaksi kuitansi yang tersisa untuk diekspor (kosong, milik Pemotong sendiri, atau bukan narasumber).');
     return;
   }
 
