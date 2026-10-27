@@ -4619,6 +4619,7 @@ function deletePayroll(id) {
    ========================================================================== */
 function vLainnya() {
   if (sub === 'pajak') return vPajak();
+  if (sub === 'bukpot') return vBukpot();
   if (sub === 'users') return vUsers();
   if (sub === 'roles') return vRoles();
   if (sub === 'audit') return vAudit();
@@ -4689,6 +4690,14 @@ function vLainnya() {
         '</div>' +
         '<div class="r">›</div>' +
       '</button>' +
+      '<button class="it" onclick="go(null, \'bukpot\')">' +
+        '<div class="avatar" style="color:var(--ok)">🧾</div>' +
+        '<div class="t">' +
+          '<b>Bukti Potong: Narasumber &amp; Sewa</b>' +
+          '<span>Lembar kerja PPh 21, PPh 23 &amp; PPh 4(2) untuk Ketua</span>' +
+        '</div>' +
+        '<div class="r">›</div>' +
+      '</button>' +
       '<button class="it" onclick="go(null, \'users\')">' +
         '<div class="avatar" style="color:var(--info)">👥</div>' +
         '<div class="t">' +
@@ -4753,6 +4762,351 @@ function vLainnya() {
    SUB-VIEWS
    ========================================================================== */
 
+/* ==========================================================================
+   BUKTI POTONG: NARASUMBER (PPh 21) & SEWA RUMAH/KENDARAAN (PPh 4(2) / PPh 23)
+   Lembar kerja pemotongan untuk Ketua Peneliti sebagai pemotong.
+   CATATAN: ini rekap data, BUKAN bukti potong resmi. Bukti potong resmi tetap
+   diterbitkan lewat Coretax/e-Bupot oleh pemotong yang sah.
+   ========================================================================== */
+const BP_SEWA = {
+  kendaraan: { label: 'Sewa Kendaraan', pajak: 'PPh 23', rate: 0.02, field: 'tax_pph23' },
+  rumah: { label: 'Sewa Rumah / Bangunan', pajak: 'PPh 4(2) Final', rate: 0.10, field: 'tax_pph42' }
+};
+
+const bpDigits = s => String(s || '').replace(/\D/g, '');
+const bpIdOk = s => { const d = bpDigits(s); return d.length === 15 || d.length === 16; };
+const bpPct = r => String(Math.round(r * 1000) / 10).replace('.', ',') + '%';
+
+/* Cari NIK/NPWP yang terselip di teks vendor, contoh: "Siti (NIK 6402045402810002)" */
+function bpGuessId(text) {
+  const m = String(text || '').match(/(?:NIK|NPWP)\D{0,3}([\d.\-\s]{15,24})/i);
+  return m ? bpDigits(m[1]) : '';
+}
+
+function bpSewaTypeOf(t) {
+  if (!t || t.dir !== 'out' || t.void) return null;
+  if (t.sewa_type === 'none') return null;
+  if (t.sewa_type && BP_SEWA[t.sewa_type]) return t.sewa_type;
+  if ((t.tax_pph42 || 0) > 0) return 'rumah';
+  const txt = [t.note, t.vendor, t.ref].join(' ');
+  if ((t.tax_pph23 || 0) > 0 && /sewa|rental|mobil|motor|kendaraan/i.test(txt)) return 'kendaraan';
+  return null;
+}
+
+function bpSewaRows(pid) {
+  return txnsOf(pid)
+    .map(t => ({ t, type: bpSewaTypeOf(t) }))
+    .filter(x => x.type)
+    .map(({ t, type }) => {
+      const def = BP_SEWA[type];
+      const gross = t.gross || t.amount || 0;
+      const calc = Math.round(gross * def.rate);
+      const recorded = t[def.field] || 0;
+      const rawName = (t.lessor_name || t.vendor || '').replace(/\s*\((?:NIK|NPWP)[^)]*\)\s*/i, '').trim();
+      const nid = bpDigits(t.lessor_id) || bpGuessId(t.vendor);
+      const issues = [];
+      if (!rawName) issues.push('Nama pemilik/penyedia belum diisi');
+      if (!bpIdOk(nid)) issues.push('NIK/NPWP belum valid (harus 15 atau 16 digit)');
+      if (!t.date) issues.push('Tanggal bayar kosong');
+      if (!(gross > 0)) issues.push('Nilai bruto 0');
+      if (recorded !== calc) {
+        issues.push('Pajak tercatat Rp ' + fmtN(recorded) + ' berbeda dari hitungan ' + bpPct(def.rate) + ' = Rp ' + fmtN(calc));
+      }
+      return {
+        id: t.id, type, jenis: def.label, pajak: def.pajak, rate: def.rate,
+        tgl: t.date || '', ref: t.ref || '', name: rawName, nid, addr: t.lessor_addr || '',
+        gross, calc, recorded, deposit: recorded > 0 ? recorded : calc,
+        issues, note: t.note || ''
+      };
+    })
+    .sort((a, b) => String(a.tgl).localeCompare(String(b.tgl)));
+}
+
+function bpNarasumberRows(pid) {
+  return payrollsOf(pid)
+    .map(pay => ({ pay, w: S.workers.find(x => x.id === pay.wid) }))
+    .filter(({ w }) => w && /narasumber|pakar/i.test(w.role || ''))
+    .map(({ pay, w }) => {
+      const gross = pay.gross || 0;
+      const amt = pay.tax_amt || 0;
+      const eff = gross > 0 ? amt / gross : 0;
+      const nid = bpDigits(w.nik) || bpDigits(w.npwp);
+      const gol = GOL_RULES[w.golongan];
+      let dasar = 'Tarif efektif ' + bpPct(eff) + ' dari bruto';
+      if (gol && gol.final) dasar = 'Tarif final golongan ' + bpPct(eff) + ' dari bruto';
+      else if (Math.abs(eff - 0.025) < 0.0005) dasar = 'DPP 50% x tarif Pasal 17 (5%) = 2,5% dari bruto';
+      const issues = [];
+      if (!bpIdOk(nid)) issues.push('NIK/NPWP belum valid (harus 15 atau 16 digit)');
+      if (!pay.date) issues.push('Tanggal bayar kosong');
+      if (!(gross > 0)) issues.push('Honor bruto 0');
+      if (w.golongan === 'non_pns_non') issues.push('Tercatat tanpa NPWP, cek ketentuan tarifnya');
+      return {
+        id: pay.id, jenis: 'Narasumber', pajak: 'PPh 21', tgl: pay.date || '', ref: pay.ref || '',
+        name: w.name, nid, nik: bpDigits(w.nik), npwp: bpDigits(w.npwp),
+        golongan: gol ? gol.label : (w.golongan || ''), kegiatan: pay.period || pay.note || '',
+        gross, eff, dasar, amt, deposit: amt, issues
+      };
+    })
+    .sort((a, b) => String(a.tgl).localeCompare(String(b.tgl)));
+}
+
+function bpDue(masa, day) {
+  const [y, m] = masa.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return ny + '-' + String(nm).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
+function bpSetoran(nar, sewa) {
+  const map = {};
+  const add = (tgl, pajak, gross, amt) => {
+    const masa = String(tgl || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(masa)) return;
+    const k = masa + '|' + pajak;
+    if (!map[k]) map[k] = { masa, pajak, n: 0, gross: 0, amt: 0 };
+    map[k].n += 1; map[k].gross += gross; map[k].amt += amt;
+  };
+  nar.forEach(r => add(r.tgl, r.pajak, r.gross, r.deposit));
+  sewa.forEach(r => add(r.tgl, r.pajak, r.gross, r.deposit));
+  return Object.values(map)
+    .sort((a, b) => a.masa.localeCompare(b.masa) || a.pajak.localeCompare(b.pajak))
+    .map(x => Object.assign(x, { setor: bpDue(x.masa, 15), lapor: bpDue(x.masa, 20) }));
+}
+
+function bpPill(issues) {
+  return issues.length
+    ? '<span class="pill warning" style="font-size:10.5px">⚠️ ' + issues.length + ' perlu dicek</span>'
+    : '<span class="pill ok" style="font-size:10.5px">✓ Data lengkap</span>';
+}
+
+function bpIssueList(issues) {
+  return issues.length
+    ? '<ul class="tiny" style="margin:6px 0 0;padding-left:16px;line-height:1.5;color:var(--warning)">' +
+      issues.map(i => '<li>' + esc(i) + '</li>').join('') + '</ul>'
+    : '';
+}
+
+function vBukpot() {
+  const p = P();
+  const nar = bpNarasumberRows(p.id);
+  const sewa = bpSewaRows(p.id);
+  const kend = sewa.filter(r => r.type === 'kendaraan');
+  const rmh = sewa.filter(r => r.type === 'rumah');
+  const sum = a => a.reduce((s, r) => s + r.deposit, 0);
+  const setoran = bpSetoran(nar, sewa);
+  const totalIssues = nar.concat(sewa).filter(r => r.issues.length).length;
+
+  const narCards = nar.length ? nar.map(r =>
+    '<div class="card" style="background:var(--panel2);padding:12px">' +
+      '<div class="row between" style="align-items:flex-start;gap:8px">' +
+        '<div><b>' + esc(r.name) + '</b><div class="tiny muted">' + esc(r.kegiatan) + '</div></div>' +
+        bpPill(r.issues) +
+      '</div>' +
+      '<div class="tiny" style="margin-top:6px;line-height:1.6">' +
+        'NIK/NPWP: <b>' + esc(r.nid || '—') + '</b><br>' +
+        'Tgl bayar: ' + (r.tgl ? fdl(r.tgl) : '—') + ' · Ref: ' + esc(r.ref || '—') + '<br>' +
+        'Bruto: <b>' + rpC(r.gross) + '</b> · PPh 21: <b>' + rpC(r.amt) + '</b><br>' +
+        '<span class="muted">' + esc(r.dasar) + '</span>' +
+      '</div>' +
+      bpIssueList(r.issues) +
+      '<div class="row" style="margin-top:8px"><button class="btn xs outline" onclick="bpCopy(\'nar\',\'' + r.id + '\')">📋 Salin data</button></div>' +
+    '</div>').join('')
+    : '<p class="muted small">Belum ada honor narasumber. Narasumber dikenali dari peran "Narasumber" atau "Pakar" di menu Tim.</p>';
+
+  const sewaCard = r =>
+    '<div class="card" style="background:var(--panel2);padding:12px">' +
+      '<div class="row between" style="align-items:flex-start;gap:8px">' +
+        '<div><b>' + esc(r.name || '(nama belum diisi)') + '</b><div class="tiny muted">' + esc(r.jenis) + ' · ' + esc(r.note) + '</div></div>' +
+        bpPill(r.issues) +
+      '</div>' +
+      '<div class="tiny" style="margin-top:6px;line-height:1.6">' +
+        'NIK/NPWP: <b>' + esc(r.nid || '—') + '</b><br>' +
+        'Tgl bayar: ' + (r.tgl ? fdl(r.tgl) : '—') + ' · Ref: ' + esc(r.ref || '—') + '<br>' +
+        'Bruto: <b>' + rpC(r.gross) + '</b> · ' + esc(r.pajak) + ' ' + bpPct(r.rate) + ': <b>' + rpC(r.deposit) + '</b>' +
+      '</div>' +
+      bpIssueList(r.issues) +
+      '<div class="row" style="margin-top:8px;gap:8px">' +
+        '<button class="btn xs outline" onclick="sheetBpSewa(\'' + r.id + '\')">✏️ Lengkapi data</button>' +
+        '<button class="btn xs outline" onclick="bpCopy(\'sewa\',\'' + r.id + '\')">📋 Salin data</button>' +
+      '</div>' +
+    '</div>';
+
+  const setoranRows = setoran.length ? setoran.map(s =>
+    '<tr>' +
+      '<td>' + esc(s.masa) + '</td><td>' + esc(s.pajak) + '</td><td style="text-align:center">' + s.n + '</td>' +
+      '<td style="text-align:right">' + fmtN(s.amt) + '</td><td>' + fdl(s.setor) + '</td><td>' + fdl(s.lapor) + '</td>' +
+    '</tr>').join('')
+    : '<tr><td colspan="6" class="muted small">Belum ada data.</td></tr>';
+
+  return '<div class="stack">' +
+    backBar('Bukti Potong: Narasumber &amp; Sewa') +
+
+    '<div class="card" style="border-left:4px solid var(--warning);padding:12px">' +
+      '<b style="font-size:12.5px">Ini lembar kerja, bukan bukti potong resmi</b>' +
+      '<p class="tiny muted" style="margin:4px 0 0;line-height:1.5">Bukti potong resmi diterbitkan lewat Coretax/e-Bupot oleh pemotong yang sah. ' +
+      'Data di bawah disiapkan agar Ketua tinggal menyalin atau mengunggah. Konfirmasi ke bagian pajak UNAIR bahwa akun Ketua boleh menjadi pemotong untuk ketiga jenis pajak ini. ' +
+      'Kode objek pajak dan format impor belum diverifikasi di sini, cek ke panduan resmi Coretax.</p>' +
+    '</div>' +
+
+    '<div class="card" style="background:var(--hero);color:var(--hero-ink)">' +
+      '<div class="lab" style="color:var(--hero-muted)">Total pajak yang dipotong (narasumber + sewa)</div>' +
+      '<div class="big">' + bigRp(sum(nar) + sum(sewa)) + '</div>' +
+      '<div class="flow">' +
+        '<div>PPh 21 Narasumber<b>' + rpC(sum(nar)) + '</b></div>' +
+        '<div>PPh 23 Kendaraan<b>' + rpC(sum(kend)) + '</b></div>' +
+        '<div>PPh 4(2) Rumah<b>' + rpC(sum(rmh)) + '</b></div>' +
+      '</div>' +
+      '<div class="tiny" style="margin-top:8px;color:var(--hero-muted)">' + (totalIssues ? '⚠️ ' + totalIssues + ' baris perlu dilengkapi sebelum bukti potong dibuat' : '✓ Semua baris lengkap') + '</div>' +
+    '</div>' +
+
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn pri block" style="flex:1" onclick="bpExportXlsx()">⬇️ Excel</button>' +
+      '<button class="btn block" style="flex:1" onclick="bpExportCsv()">📊 CSV</button>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<h3 style="margin-bottom:6px">Setoran &amp; pelaporan per masa pajak</h3>' +
+      '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">' +
+        '<thead><tr style="text-align:left"><th>Masa</th><th>Pajak</th><th>Bukpot</th><th style="text-align:right">Setor (Rp)</th><th>Batas setor</th><th>Batas lapor</th></tr></thead>' +
+        '<tbody>' + setoranRows + '</tbody></table></div>' +
+      '<p class="tiny muted" style="margin:6px 0 0;line-height:1.5">Batas 15 dan 20 bulan berikutnya adalah ketentuan umum yang saya temukan untuk PPh 23. Untuk PPh 21 dan PPh 4(2), cek ulang ke ketentuan resmi.</p>' +
+    '</div>' +
+
+    '<div class="card stack" style="gap:10px"><h3 style="margin:0">Narasumber (PPh 21) · ' + nar.length + '</h3>' + narCards + '</div>' +
+
+    '<div class="card stack" style="gap:10px"><div class="row between"><h3 style="margin:0">Sewa · ' + sewa.length + '</h3>' +
+      '<button class="btn xs outline" onclick="sheetBpPickSewa()">＋ Tandai transaksi sewa</button></div>' +
+      (sewa.length ? kend.concat(rmh).map(sewaCard).join('') : '<p class="muted small">Belum ada transaksi sewa terdeteksi. Gunakan tombol di atas untuk menandai transaksi kas keluar sebagai sewa rumah atau kendaraan.</p>') +
+    '</div>' +
+  '</div>';
+}
+
+window.bpCopy = function (kind, id) {
+  const p = P();
+  let line = '';
+  if (kind === 'nar') {
+    const r = bpNarasumberRows(p.id).find(x => x.id === id);
+    if (!r) return;
+    line = ['PPh 21', r.name, r.nid, r.tgl, r.gross, r.amt, r.dasar].join('\t');
+  } else {
+    const r = bpSewaRows(p.id).find(x => x.id === id);
+    if (!r) return;
+    line = [r.pajak, r.name, r.nid, r.tgl, r.gross, r.deposit, bpPct(r.rate)].join('\t');
+  }
+  const done = () => toast('Data disalin ke clipboard ✓');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(line).then(done, () => toast('Gagal menyalin'));
+  else toast('Browser tidak mendukung salin otomatis');
+};
+
+window.sheetBpSewa = function (id) {
+  const t = S.txns.find(x => x.id === id);
+  if (!t) return;
+  const cur = bpSewaTypeOf(t) || 'rumah';
+  const row = bpSewaRows(P().id).find(r => r.id === id);
+  sheet('Data Pemilik Sewa',
+    '<div class="stack">' +
+      fld('Jenis sewa',
+        '<select id="bp-type">' +
+          '<option value="rumah"' + (cur === 'rumah' ? ' selected' : '') + '>Sewa rumah / bangunan (PPh 4(2) Final 10%)</option>' +
+          '<option value="kendaraan"' + (cur === 'kendaraan' ? ' selected' : '') + '>Sewa kendaraan (PPh 23 2%)</option>' +
+          '<option value="none">Bukan sewa (hapus dari daftar)</option>' +
+        '</select>') +
+      fld('Nama pemilik / penyedia', '<input id="bp-name" value="' + esc(row ? row.name : (t.vendor || '')) + '" placeholder="Sesuai KTP / NPWP">') +
+      fld('NIK / NPWP pemilik', '<input id="bp-id" class="num" inputmode="numeric" maxlength="24" value="' + esc(row ? row.nid : '') + '" placeholder="15 atau 16 digit">', 'NIK 16 digit, atau NPWP 15/16 digit') +
+      fld('Alamat (opsional)', '<input id="bp-addr" value="' + esc(t.lessor_addr || '') + '">') +
+    '</div>',
+    'Simpan',
+    () => {
+      const type = $('#bp-type').value;
+      const nid = bpDigits($('#bp-id').value);
+      if (type !== 'none' && nid && !bpIdOk(nid)) {
+        $('#sheet-e').textContent = 'NIK/NPWP harus 15 atau 16 digit.';
+        return;
+      }
+      t.sewa_type = type;
+      t.lessor_name = $('#bp-name').value.trim();
+      t.lessor_id = nid;
+      t.lessor_addr = $('#bp-addr').value.trim();
+      saveState();
+      closeSheet();
+      toast('Data sewa disimpan ✓');
+      render();
+    });
+};
+
+window.sheetBpPickSewa = function () {
+  const p = P();
+  const list = txnsOf(p.id)
+    .filter(t => t.dir === 'out' && t.cat !== 'honor' && !bpSewaTypeOf(t))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 40);
+  sheet('Tandai Transaksi Sewa',
+    list.length
+      ? '<div class="stack" style="gap:8px"><p class="tiny muted" style="margin:0">Pilih transaksi kas keluar yang merupakan sewa rumah atau kendaraan.</p>' +
+        list.map(t =>
+          '<button class="card" style="text-align:left;width:100%;background:var(--panel2);padding:10px" onclick="closeSheet();sheetBpSewa(\'' + t.id + '\')">' +
+            '<b>' + esc(t.vendor || t.note || t.ref || 'Transaksi') + '</b>' +
+            '<div class="tiny muted">' + fdl(t.date) + ' · ' + rpC(t.gross || t.amount) + '</div>' +
+          '</button>').join('') + '</div>'
+      : '<p class="muted small">Tidak ada transaksi kas keluar lain yang bisa ditandai.</p>',
+    'Tutup', () => closeSheet(), 'outline');
+};
+
+function bpDownload(name, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+function bpTables() {
+  const p = P();
+  const nar = bpNarasumberRows(p.id);
+  const sewa = bpSewaRows(p.id);
+  const narHead = ['No', 'Nama', 'NIK/NPWP', 'Kegiatan', 'Tgl bayar', 'No ref', 'Bruto', 'Dasar pemotongan', 'PPh 21 dipotong', 'Catatan cek'];
+  const narAoa = [narHead].concat(nar.map((r, i) => [i + 1, r.name, r.nid, r.kegiatan, r.tgl, r.ref, r.gross, r.dasar, r.amt, r.issues.join('; ')]));
+  const sewaHead = ['No', 'Jenis', 'Pajak', 'Nama pemilik', 'NIK/NPWP', 'Alamat', 'Tgl bayar', 'No ref', 'Bruto', 'Tarif', 'Pajak dipotong', 'Catatan cek'];
+  const mk = type => sewa.filter(r => r.type === type).map((r, i) =>
+    [i + 1, r.jenis, r.pajak, r.name, r.nid, r.addr, r.tgl, r.ref, r.gross, bpPct(r.rate), r.deposit, r.issues.join('; ')]);
+  const setoran = bpSetoran(nar, sewa);
+  const setHead = ['Masa', 'Pajak', 'Jumlah bukpot', 'Bruto', 'Pajak disetor', 'Batas setor', 'Batas lapor'];
+  const setAoa = [setHead].concat(setoran.map(s => [s.masa, s.pajak, s.n, s.gross, s.amt, s.setor, s.lapor]));
+  return {
+    nar: narAoa,
+    kend: [sewaHead].concat(mk('kendaraan')),
+    rumah: [sewaHead].concat(mk('rumah')),
+    setoran: setAoa
+  };
+}
+
+window.bpExportXlsx = function () {
+  if (typeof XLSX === 'undefined') { toast('Library Excel belum termuat'); return; }
+  const t = bpTables();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.nar), 'Narasumber PPh21');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.kend), 'Sewa Kendaraan PPh23');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.rumah), 'Sewa Rumah PPh4-2');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t.setoran), 'Setoran per Masa');
+  XLSX.writeFile(wb, 'Lembar_Kerja_Bukti_Potong_' + (P().year || 2026) + '.xlsx');
+};
+
+window.bpExportCsv = function () {
+  const t = bpTables();
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const block = (title, rows) => [q(title)].concat(rows.map(r => r.map(q).join(','))).join('\r\n');
+  const csv = '\ufeff' + [
+    block('NARASUMBER (PPh 21)', t.nar),
+    block('SEWA KENDARAAN (PPh 23)', t.kend),
+    block('SEWA RUMAH (PPh 4(2) Final)', t.rumah),
+    block('SETORAN PER MASA', t.setoran)
+  ].join('\r\n\r\n');
+  bpDownload('Lembar_Kerja_Bukti_Potong_' + (P().year || 2026) + '.csv', 'text/csv;charset=utf-8', csv);
+};
+
+
 /* Sub-View: Pajak & Coretax DJP */
 function vPajak() {
   const p = P();
@@ -4771,6 +5125,8 @@ function vPajak() {
         '<div>PPh 23 Sewa/Jasa<b>' + rpC(pjk.pph23) + '</b></div>' +
       '</div>' +
     '</div>' +
+
+    '<button class="btn block" style="text-align:left;padding:12px 14px" onclick="go(null, \'bukpot\')">🧾 <b>Bukti Potong Narasumber &amp; Sewa</b><div class="tiny muted">Lembar kerja untuk Ketua: PPh 21, PPh 23, PPh 4(2)</div></button>' +
 
     '<div class="card" style="background:linear-gradient(135deg, rgba(2,132,199,0.12), rgba(14,165,233,0.06));border:1.5px solid rgba(2,132,199,0.3);padding:14px 16px;border-radius:14px">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
@@ -7374,6 +7730,7 @@ function render() {
   else if (sub === 'ekspor') viewEl.innerHTML = vEkspor();
   else if (sub === 'spj') viewEl.innerHTML = vSpj();
   else if (sub === 'pajak') viewEl.innerHTML = vPajak();
+  else if (sub === 'bukpot') viewEl.innerHTML = vBukpot();
   else if (sub === 'users') viewEl.innerHTML = vUsers();
   else if (sub === 'roles') viewEl.innerHTML = vRoles();
   else if (sub === 'audit') viewEl.innerHTML = vAudit();
