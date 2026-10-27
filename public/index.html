@@ -3955,10 +3955,29 @@ function sheetTxnDetail(id) {
 function sheetTxnEdit(id) {
   const t = S.txns.find(x => x.id === id);
   if (!t) return;
+  const canCat = t.dir === 'out' && t.cat !== 'honor';
+  const sw = bpSewaTypeOf(t);
+  const curCat = sw ? ('sewa_' + sw) : t.cat;
+  const sRow = sw ? (bpSewaRows(t.pid).find(r => r.id === t.id) || {}) : {};
   sheet('Edit Transaksi & Identitas Pemilik',
     '<div class="stack">' +
       fld('Tanggal Transaksi', '<input type="date" id="et-date" value="' + (t.date || today()) + '">') +
+      (canCat
+        ? fld('Kategori Belanja',
+            '<select id="et-cat" onchange="bpEditCatChange()">' +
+              Object.entries(CAT_OUT).filter(([k]) => k !== 'honor').map(([k, v]) =>
+                '<option value="' + k + '"' + (k === curCat ? ' selected' : '') + '>' + v + '</option>').join('') +
+            '</select>',
+            'Pilih Sewa Rumah atau Sewa Kendaraan kalau ini transaksi sewa, supaya masuk ke bukti potong')
+        : '') +
       fld('Nama Pemilik / Penyedia (Vendor)', '<input id="et-vendor" value="' + esc(t.vendor || '') + '" placeholder="Contoh: Bpk. Sugiono (Pemilik Posko)">') +
+      '<div id="et-sewa-box" class="card stack" style="display:none;gap:8px;background:var(--panel2);padding:12px;border-left:4px solid var(--info)">' +
+        '<b class="small">Data pemilik sewa (untuk bukti potong)</b>' +
+        fld('Nama pemilik sesuai KTP / NPWP', '<input id="et-lname" value="' + esc(sRow.name || t.lessor_name || '') + '">') +
+        fld('NIK / NPWP pemilik', '<input id="et-lid" class="num" inputmode="numeric" maxlength="24" value="' + esc(sRow.nid || '') + '" placeholder="15 atau 16 digit">', 'NIK 16 digit, atau NPWP 15/16 digit') +
+        fld('Alamat (opsional)', '<input id="et-laddr" value="' + esc(t.lessor_addr || '') + '">') +
+        '<div id="et-sewa-preview" class="tiny muted" style="line-height:1.5"></div>' +
+      '</div>' +
       fld('Keterangan & NIK Pemilik KTP', '<textarea id="et-note" placeholder="Catatan transaksi atau NIK KTP pemilik">' + esc(t.note || '') + '</textarea>', 'Bisa cantumkan NIK KTP 16 digit pemilik di sini agar tersimpan rapi') +
       fld('Nomor Kuitansi / Referensi', '<input id="et-ref" value="' + esc(t.ref || '') + '" placeholder="KWT-001">') +
       '<div class="grid2">' +
@@ -3968,12 +3987,41 @@ function sheetTxnEdit(id) {
     '</div>',
     'Simpan Perubahan',
     () => {
+      const newCat = canCat && $('#et-cat') ? $('#et-cat').value : t.cat;
+      const isSewa = newCat === 'sewa_rumah' || newCat === 'sewa_kendaraan';
+      const lname = isSewa ? $('#et-lname').value.trim() : '';
+      const lid = isSewa ? bpDigits($('#et-lid').value) : '';
+      if (isSewa && !lname) { $('#sheet-e').textContent = 'Nama pemilik sewa wajib diisi.'; return; }
+      if (isSewa && lid && !bpIdOk(lid)) { $('#sheet-e').textContent = 'NIK/NPWP harus 15 atau 16 digit (atau kosongkan dulu).'; return; }
+
       t.date = $('#et-date').value || t.date;
       t.vendor = $('#et-vendor').value.trim();
       t.note = $('#et-note').value.trim();
       t.ref = $('#et-ref').value.trim();
       t.amount = parseN($('#et-amount').value) || t.amount;
       t.gross = parseN($('#et-gross').value) || t.gross;
+
+      if (canCat) {
+        if (isSewa) {
+          const type = newCat === 'sewa_rumah' ? 'rumah' : 'kendaraan';
+          const gross = t.gross || t.amount || 0;
+          t.cat = newCat;
+          t.sewa_type = type;
+          t.lessor_name = lname;
+          t.lessor_id = lid;
+          t.lessor_addr = $('#et-laddr').value.trim();
+          t.vendor = lname;
+          t.tax_pph42 = type === 'rumah' ? Math.round(gross * BP_SEWA.rumah.rate) : 0;
+          t.tax_pph23 = type === 'kendaraan' ? Math.round(gross * BP_SEWA.kendaraan.rate) : 0;
+        } else {
+          const wasSewa = t.cat === 'sewa_rumah' || t.cat === 'sewa_kendaraan' || (t.sewa_type && t.sewa_type !== 'none');
+          t.cat = newCat;
+          if (wasSewa) {
+            delete t.sewa_type; delete t.lessor_name; delete t.lessor_id; delete t.lessor_addr;
+            t.tax_pph42 = 0; t.tax_pph23 = 0;
+          }
+        }
+      }
       saveState();
       closeSheet();
       toast('Data transaksi berhasil disimpan ✓');
@@ -3981,7 +4029,26 @@ function sheetTxnEdit(id) {
       setTimeout(() => sheetTxnDetail(t.id), 200);
     }
   );
+  setTimeout(() => {
+    const g = $('#et-gross');
+    if (g) g.addEventListener('input', bpEditCatChange);
+    bpEditCatChange();
+  }, 60);
 }
+
+window.bpEditCatChange = function () {
+  const c = $('#et-cat');
+  const box = $('#et-sewa-box');
+  if (!box) return;
+  const cat = c ? c.value : '';
+  const type = cat === 'sewa_rumah' ? 'rumah' : (cat === 'sewa_kendaraan' ? 'kendaraan' : null);
+  box.style.display = type ? '' : 'none';
+  const pv = $('#et-sewa-preview');
+  if (!type || !pv) return;
+  const def = BP_SEWA[type];
+  const gross = parseN($('#et-gross').value);
+  pv.innerHTML = def.pajak + ' ' + bpPct(def.rate) + ' dari bruto Rp ' + fmtN(gross) + ' = <b>' + rpC(Math.round(gross * def.rate)) + '</b>. Nominal kas keluar tidak diubah.';
+};
 
 function deleteTxn(id) {
   if (!confirm('Yakin ingin menghapus transaksi ini?')) return;
@@ -5077,7 +5144,7 @@ window.bpPickFilter = function () {
   const all = window.__bpPick || [];
   const q = ($('#bp-q') ? $('#bp-q').value : '').trim().toLowerCase();
   const txt = t => [t.vendor, t.note, t.ref, CAT_OUT[t.cat]].join(' ');
-  const likelyRe = /\bsewa\b|rental|posko|homestay|penginapan|villa|kontrak|kost|mobil|motor|kendaraan|travel|\bbus\b|\belf\b/i;
+  const likelyRe = /\bsewa\b|rental|posko|homestay|mobil|motor|kendaraan/i;
   let list = all.filter(t => !q || txt(t).toLowerCase().includes(q));
   const likely = t => likelyRe.test(txt(t));
   if (!q) list = list.filter(likely).concat(list.filter(t => !likely(t)));
